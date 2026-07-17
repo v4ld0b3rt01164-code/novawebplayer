@@ -1,0 +1,28 @@
+/**
+ * Pipeline de vídeo baseado em ffmpeg.
+ *
+ * Para LIVE: faz download completo do .m3u8 upstream (que tem segmentos
+ * protegidos por sessão do painel) e gera HLS local com -c copy
+ * (sem re-encoding, rápido).
+ *
+ * Para MOVIE/SERIES: baixa o MP4 upstream e gera HLS local com
+ * transcodificação para H.264/AAC (resolve codec incompatível).
+ *
+ * O frontend consome sempre /transcode/<type>/<file>?token=<uuid> e
+ * o player recebe um HLS local em H.264/AAC.
+ */
+import type { Session } from '../session/store.js';
+/**
+ * Inicia (ou reutiliza) o pipeline ffmpeg para o stream.
+ * Retorna o diretório onde o m3u8 e os segmentos são gerados.
+ */
+export declare function startTranscode(session: Session, type: 'live' | 'movie' | 'series', file: string): Promise<string>;
+export declare function touch(session: Session, type: string, file: string): void;
+export declare function getDir(session: Session, type: 'live' | 'movie' | 'series', file: string): string;
+export declare function playlistPath(dir: string): string;
+export declare function segmentPath(dir: string, segment: string): string;
+export declare function readPlaylistStream(dir: string): import("fs").ReadStream;
+export declare function readSegmentStream(dir: string, segment: string): import("fs").ReadStream;
+export declare function segmentStat(dir: string, segment: string): import("fs").Stats | null;
+export declare function waitForFirstSeg(dir: string, timeoutMs?: number): Promise<boolean>;
+//# sourceMappingURL=transcode.d.ts.map

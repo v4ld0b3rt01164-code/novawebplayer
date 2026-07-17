@@ -1,0 +1,257 @@
+# STATUS — NOVA Web Player
+
+Documento vivo do estado atual do projeto. Atualizado em: 2026-07-17
+(seguranca: path traversal corrigido + rate limiting + checkpoint git `checkpoint-2026-07-17`).
+**Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
+
+---
+
+## 1. Visao geral
+
+Cliente web de paineis IPTV Xtream Codes, com backend Node + frontend React.
+O usuario final so ve o dominio `https://novawebplayer.app` (mesma origem em
+producao, via Cloudflare Tunnel). Os dominios IPTV e as credenciais ficam
+isolados no backend.
+
+---
+
+## 2. Stack
+
+| Camada   | Tecnologia |
+|----------|------------|
+| Backend  | Node.js + Fastify 5 + TypeScript 6 |
+| Frontend | React 19 + Vite 8 + TypeScript + TailwindCSS 4 |
+| Player   | `<video>` nativo + hls.js (live) |
+| Data     | React Query 5 |
+| XMLTV    | fast-xml-parser 5 (backend, cache 30 min) |
+| Sessao   | Memoria + token UUID (TTL 24h) |
+| Operacao | PM2 7 (local), Cloudflare Tunnel (publico), scripts Windows `.bat` |
+
+---
+
+## 3. Endpoints
+
+### Backend (`https://novawebplayer.app`)
+
+| Metodo | Rota | Auth | Descricao |
+|--------|------|------|-----------|
+| GET    | `/api/health` | nao | healthcheck |
+| POST   | `/api/auth` | nao | login com `{ username, password }` (fallback entre 8 dominios; rate limit 5 req/min por IP) |
+| GET    | `/api/live/categories` | sim | categorias de TV ao vivo |
+| GET    | `/api/live/streams?category_id=` | sim | canais da categoria |
+| GET    | `/api/live/short_epg/:stream_id` | sim | EPG curto |
+| GET    | `/api/movies/categories` | sim | categorias de filmes |
+| GET    | `/api/movies/streams?category_id=` | sim | filmes |
+| GET    | `/api/movies/:vod_id` | sim | info de um filme |
+| GET    | `/api/series/categories` | sim | plataformas |
+| GET    | `/api/series?category_id=` | sim | series |
+| GET    | `/api/series/:series_id` | sim | info + temporadas + episodios |
+| GET    | `/api/epg` | sim | XMLTV parseado (cache 30 min) |
+| GET    | `/api/epg/channel/:epg_channel_id` | sim | EPG de um canal |
+| OPTIONS | `/stream/:type/:file` | sim | CORS preflight |
+| GET    | `/stream/:type/:file` | sim | proxy de playlist .m3u8 ou arquivo .mp4/.ts (com Range) |
+| GET    | `/stream/seg/:type/:file/:segment` | sim | proxy de segmento .ts (live) |
+
+---
+
+## 4. Como funciona o proxy de streams
+
+### Live (HLS)
+
+1. Frontend pede `/stream/live/217275.m3u8?token=xxx`
+2. Backend busca m3u8 do upstream (`liderpremium.xyz/live/user/pass/217275.m3u8`)
+3. Backend reescreve URLs dos segmentos para `/stream/seg/live/...`
+4. Backend armazena IP real do servidor (descoberto via redirect do `.ts`)
+5. Frontend (hls.js) pede segmentos ao backend
+6. Backend busca segmentos do IP real (Cloudflare bloqueia `/hls/...`)
+
+### VOD/Series (mp4)
+
+1. Frontend pede `/stream/movie/722955.mp4?token=xxx`
+2. Backend detecta extensao `.mp4` (nao e m3u8)
+3. Backend busca mp4 do upstream com suporte a Range requests
+4. Backend retorna stream com headers `Accept-Ranges: bytes`
+5. Browser usa `<video>` nativo (sem hls.js)
+
+### Descoberta do servidor real
+
+O Cloudflare bloqueia requests GET para `/hls/...` (retorna 403/404).
+Solucao: o backend faz request para `/live/user/pass/ID.ts` com
+`redirect: 'manual'`, le o header `Location` que aponta para o IP
+real (ex: `http://130.250.188.105:80/...`), cacheia esse IP, e usa
+para buscar segmentos.
+
+---
+
+## 5. Frontend — fluxos
+
+### Login
+1. `POST /api/auth` com `{ username, password }`.
+2. Backend tenta os 8 dominios em ordem, com timeout 5s. Sucesso = `user_info.auth === 1`.
+3. Token UUID guardado **apenas em memoria** (Context). Nenhum localStorage/sessionStorage.
+4. Proximas chamadas enviam `Authorization: Bearer <token>`.
+5. Erro 401 com mensagem generica (sem expor credenciais).
+
+### Menu
+- 3 botoes com SVGs sem moldura (sem bg, ring, shadow, rounded).
+- **Desktop**: empilhados, SVG 192px, texto 3xl.
+- **Mobile**: 3 colunas lado a lado, SVG 80px, texto base, visiveis todos sem scroll.
+- Botao "Sair" limpa o contexto e o cache do React Query.
+
+### TV AO VIVO
+- Categorias -> Canais -> Player.
+- **Auto-play**: ao entrar em uma pasta, o primeiro canal e selecionado automaticamente e o player comeca a reproduzir.
+- **Layout split fixo (desktop)**: player + EPG travados com `fixed inset-0 z-50`, coluna de canais rola com `overflow-y-auto` separado. Garante que o player sempre fique visivel sem scrollar.
+- **Layout split fixo (mobile)**: player + EPG em cima (`flex-shrink-0`), canais embaixo (`overflow-y-auto flex-1`).
+- **Maximizar**: botao de setas no canto do player -> tela inteira com EPG. Botao de voltar -> minimiza.
+- EPG now/next na lista de canais.
+- Player: hls.js (Chrome/Firefox) ou nativo (Safari).
+
+### FILMES
+- Tela inicial: lista de categorias + busca geral.
+- Dentro da categoria: filtro local pelo nome.
+- **Layout desktop**: info do filme (poster, sinopse, diretor, elenco) na coluna esquerda, mini-player 50% na direita.
+- **Layout mobile**: player em cima, info embaixo.
+- **Maximizar**: botao de setas -> tela inteira.
+- Player: `<video>` nativo (mp4).
+
+### SERIES & NOVELAS
+- Tela inicial: lista de plataformas + busca geral.
+- Grade de series: filtro local.
+- **Ao clicar em uma serie**: detalhe (poster + placeholder player) abre imediatamente.
+- Detalhe da serie: temporadas (chips) + busca de episodios.
+- **Layout split fixo (desktop)**: detalhe + lista de episodios na coluna esquerda (scroll), mini-player 50% na direita.
+- **Layout mobile**: poster+sinopse topo → miniplayer (com botao flutuante maximizar) → temporadas+episodios (scroll).
+- **renderMode** no `SeriesDetailContent`: `poster` | `episodes` | `all` (controle de o que renderizar).
+- **Maximizar**: botao flutuante seta `maximized: true` -> player em tela cheia com botao minimizar (mesmo padrao FILMES). **Nota: no mobile so rotaciona a tela, nao ativa fullscreen nativo.**
+- Player: `<video>` nativo (mp4).
+
+### Player (VideoPlayer.tsx)
+- Detecta extensao do arquivo na URL.
+- `.m3u8` -> hls.js (Chrome/Firefox) ou nativo (Safari).
+- `.mp4`, `.mkv`, `.ts` -> `<video>` nativo direto.
+- Auto-unmute apos playback iniciar.
+- Retry automatico em caso de erro de rede (ate 5x).
+- Media Session API para controles de lock screen.
+
+---
+
+## 6. Seguranca
+
+- Dominios IPTV **so no backend** (`backend/src/iptv/servers.ts`).
+- Credenciais **nunca** vao para o frontend. So trafegam em `POST /api/auth`.
+- Backend associa o servidor ativo ao token UUID em memoria (TTL 24h).
+- `localStorage`/`sessionStorage` **nao sao usados**.
+- Erros de login nao mencionam senha ou dominio.
+- **Static serving via @fastify/static** (root fixo em `frontend/dist`;
+  path traversal com `..` retorna 403). Nenhum caminho de arquivo e
+  construido a partir de `req.url`.
+- **Rate limiting** (`@fastify/rate-limit`): 300 req/min global +
+  5 req/min em `POST /api/auth`, por IP. Estouro responde 429.
+- **`trustProxy: true`**: IP real do cliente via `X-Forwarded-For` do
+  Cloudflare Tunnel (rate limit por usuario, nao por IP do tunnel).
+- **Headers de seguranca** no hook `onSend` (nosniff, DENY, HSTS, etc.) +
+  `cache-control: no-store` forcado em respostas `text/html`.
+- Detalhes e historico completo: `SECURITY.md`.
+
+---
+
+## 7. Operacao
+
+### Build completo
+```powershell
+cd frontend; npm run build
+cd ..\backend; npm run build
+npx pm2 restart nova-backend
+```
+
+### Dev local
+```powershell
+cd backend; npm run dev      # http://localhost:3001
+cd frontend; npm run dev     # http://localhost:5173
+```
+
+### Producao local (backend serve frontend)
+```powershell
+cd backend; npm start        # http://localhost:3001 + serve frontend/dist
+```
+
+### Scripts Windows
+- `start.bat` - Inicia backend + tunnel
+- `stop.bat` - Para tudo
+- `restart.bat` - Para e reinicia
+- `status.bat` - Verifica saude (PM2, porta, build, health)
+- `install-startup.bat` - Instala auto-inicializacao via Task Scheduler
+- `uninstall-startup.bat` - Remove auto-inicializacao
+
+### Cloudflare Tunnel
+- Binario: `C:\Program Files (x86)\cloudflared\cloudflared.exe`
+- Tunnel: `novawebplayer` (UUID `aed0ffcf-...`)
+- Config: `C:\Users\Valdo\.cloudflared\config.yml`
+
+### PM2
+- Processos: `nova-backend` (porta 3001) + `nova-tunnel` (cloudflared)
+- Ecosystem: `backend/ecosystem.windows.config.cjs`
+- Logs: `C:\Users\Valdo\.pm2\logs\`
+
+---
+
+## 8. Verificacoes executadas
+
+- Login com fallback entre 8 dominios: OK
+- **Fallback em tempo real durante streaming (401/403): OK**
+- **Single-flight de re-autenticacao (concorrencia): OK**
+- TV ao vivo (HLS com proxy de segmentos): OK (desktop + mobile)
+- **Auto-play primeiro canal ao entrar na categoria: OK**
+- **Layout split fixo TV ao vivo (player + EPG travados, canais rolando): OK (desktop + mobile)**
+- Botao maximizar/minimizar live: OK
+- Filmes VOD (mp4 com Range requests): OK (desktop + mobile)
+- Layout filmes desktop: info esquerda, player direita (50/50): OK
+- Botao maximizar/minimizar filmes: OK
+- Series (mp4 com Range requests): OK (desktop + mobile)
+- **Split series (detalhe + placeholder player ao clicar): OK**
+- **Layout mobile series (poster+player+episodios): OK**
+- **renderMode (poster/episodes/all): OK**
+- Layout split fixo series desktop (detalhe fixo + episodios scrollaveis + player): OK
+- Botao maximizar/minimizar series desktop: OK
+- **Botao maximizar series mobile: so rotaciona tela (pendente fullscreen nativo)**
+- Menu responsivo (sem moldura, 3 colunas mobile): OK
+- Busca em filmes e series: OK
+- Scripts Windows (start/stop/restart/status): OK
+- Auto-inicializacao via Task Scheduler: OK
+- **Path traversal (`--path-as-is` e `%2e%2e`): 403 bloqueado (validado em producao)**
+- **Home `/`, `/index.html`, SPA fallback (`/live` com F5): 200 com no-store**
+- **Assets `/assets/*`: 200 com cache 30d immutable**
+- **Rate limit login: 6 tentativas seguidas → 5x 401 + 1x 429**
+
+---
+
+## 9. Armadilhas conhecidas
+
+1. **BOM UTF-8 em .bat**: Write tool salva com BOM. Reescrever sem BOM.
+2. **Caracteres UTF-8 em .bat**: Evitar `=, -`. Usar ASCII.
+3. **`call npx`**: Usar `call npx pm2` nos .bat, senao o batch nao espera.
+4. **Cloudflare bloqueia /hls/**: Segmentos so funcionam via IP real.
+5. **Mobile precisa de Range**: Sem Range requests, browser nao inicia mp4.
+6. **VideoPlayer detecta extensao**: `.m3u8` usa hls.js, outra usa nativo.
+7. **Frontend servido pelo backend**: Nao usar Cloudflare Pages (evita CORS).
+8. **Layout split precisa de fixed inset-0**: Usar `min-h-full` em telas com split causa problemas — o player some quando rola. Solucao: `fixed inset-0 z-50` trava a viewport. Coluna de conteudo usa `overflow-y-auto` com `min-h-0`.
+9. **Maximizar series mobile nao vai fullscreen nativo**: Botao flutuante seta `maximized: true` (padrao FILMES) mas no iOS/Android so rotaciona a tela. Pendente: usar Fullscreen API do navegador.
+
+---
+
+## 10. Proximos passos sugeridos
+
+- [x] ~~Retry de stream em caso de falha~~ (implementado: fallback 401/403)
+- [x] ~~Layout split fixo para TV/series~~ (implementado: fixed inset-0 z-50)
+- [x] ~~Auto-play primeiro canal~~ (implementado: useEffect + useRef)
+- [x] ~~Layout mobile series (poster+player+episodios)~~ (implementado: renderMode)
+- [ ] **Fullscreen nativo no mobile** (requestFullscreen API no video — pendente)
+- [ ] EPG completo (xmltv parsing mais robusto)
+- [ ] Fallback de catalogo (categories/VOD) — mesma arquitetura de reauth.ts
+- [ ] PWA manifest
+- [ ] Download offline (v2)
+- [ ] Chromecast/AirPlay (v2)
+- [ ] Testes automatizados (vitest backend, playwright frontend)
+- [ ] Layout responsivo avancado (grid dinamico para telas intermediarias)
+- [ ] Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3

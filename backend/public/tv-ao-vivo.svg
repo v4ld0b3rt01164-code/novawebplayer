@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%" role="img" aria-label="TV ao vivo">
+  <defs>
+    <linearGradient id="bg-tv" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5384B"/>
+      <stop offset="45%" stop-color="#F0472F"/>
+      <stop offset="75%" stop-color="#F5842A"/>
+      <stop offset="100%" stop-color="#F9A62A"/>
+    </linearGradient>
+    <linearGradient id="top-sheen-tv" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="icon-fill-tv" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.55"/>
+    </linearGradient>
+    <filter id="shadow-tv" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#B5271A" flood-opacity="0.35"/>
+    </filter>
+    <filter id="icon-shadow-tv" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#7a0f10" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Button background -->
+  <rect x="8" y="8" width="284" height="284" rx="46" fill="url(#bg-tv)" filter="url(#shadow-tv)"/>
+  <rect x="8" y="8" width="284" height="284" rx="46" fill="url(#top-sheen-tv)"/>
+  <rect x="9.5" y="9.5" width="281" height="281" rx="44.5" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1.5"/>
+
+  <!-- TV icon -->
+  <g filter="url(#icon-shadow-tv)">
+    <rect x="88" y="108" width="124" height="92" rx="14" fill="url(#icon-fill-tv)"/>
+    <path d="M132 128 L172 154 L132 180 Z" fill="#F0472F" fill-opacity="0.55"/>
+    <path d="M115 200 L100 222" stroke="url(#icon-fill-tv)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M185 200 L200 222" stroke="url(#icon-fill-tv)" stroke-width="10" stroke-linecap="round"/>
+  </g>
+
+  <!-- Label -->
+  <text x="150" y="242" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-weight="800" font-size="30" fill="#ffffff" letter-spacing="0.5">TV AO VIVO</text>
+</svg>

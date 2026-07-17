@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%" role="img" aria-label="Séries e novelas">
+  <defs>
+    <linearGradient id="bg-sn" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8F6DE8"/>
+      <stop offset="50%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#6B7280"/>
+    </linearGradient>
+    <linearGradient id="top-sheen-sn" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="icon-fill-sn" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.55"/>
+    </linearGradient>
+    <filter id="shadow-sn" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#4c3a7a" flood-opacity="0.35"/>
+    </filter>
+    <filter id="icon-shadow-sn" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#332255" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Button background -->
+  <rect x="8" y="8" width="284" height="284" rx="46" fill="url(#bg-sn)" filter="url(#shadow-sn)"/>
+  <rect x="8" y="8" width="284" height="284" rx="46" fill="url(#top-sheen-sn)"/>
+  <rect x="9.5" y="9.5" width="281" height="281" rx="44.5" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1.5"/>
+
+  <!-- Two overlapping filmstrips icon -->
+  <g filter="url(#icon-shadow-sn)">
+    <g transform="rotate(-14 150 145)">
+      <rect x="112" y="95" width="60" height="100" rx="6" fill="url(#icon-fill-sn)"/>
+      <rect x="118" y="103" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="118" y="120" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="118" y="137" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="118" y="154" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="118" y="171" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="156" y="103" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="156" y="120" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="156" y="137" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="156" y="154" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="156" y="171" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="134" y="112" width="16" height="72" fill="#6B7280" fill-opacity="0.35"/>
+    </g>
+    <g transform="rotate(10 150 145)">
+      <rect x="140" y="95" width="60" height="100" rx="6" fill="url(#icon-fill-sn)"/>
+      <rect x="146" y="103" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="146" y="120" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="146" y="137" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="146" y="154" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="146" y="171" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="184" y="103" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="184" y="120" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="184" y="137" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="184" y="154" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="184" y="171" width="10" height="10" fill="#8B5CF6" fill-opacity="0.5"/>
+      <rect x="162" y="112" width="16" height="72" fill="#c4b5fd" fill-opacity="0.45"/>
+    </g>
+  </g>
+
+  <!-- Label (two lines) -->
+  <text x="150" y="234" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-weight="800" font-size="26" fill="#ffffff" letter-spacing="0.3">SÉRIES &amp;</text>
+  <text x="150" y="268" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-weight="800" font-size="26" fill="#ffffff" letter-spacing="0.3">NOVELAS</text>
+</svg>

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%" role="img" aria-label="Filmes">
+  <defs>
+    <linearGradient id="bg-fl" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22C6F2"/>
+      <stop offset="45%" stop-color="#3A7BEF"/>
+      <stop offset="100%" stop-color="#8A4CF0"/>
+    </linearGradient>
+    <linearGradient id="top-sheen-fl" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="icon-fill-fl" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.55"/>
+    </linearGradient>
+    <filter id="shadow-fl" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#3550AA" flood-opacity="0.35"/>
+    </filter>
+    <filter id="icon-shadow-fl" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#1c2a5e" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Button background -->
+  <rect x="8" y="8" width="284" height="284" rx="46" fill="url(#bg-fl)" filter="url(#shadow-fl)"/>
+  <rect x="8" y="8" width="284" height="284" rx="46" fill="url(#top-sheen-fl)"/>
+  <rect x="9.5" y="9.5" width="281" height="281" rx="44.5" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1.5"/>
+
+  <!-- Film reel + clapperboard icon -->
+  <g filter="url(#icon-shadow-fl)">
+    <!-- reel -->
+    <circle cx="112" cy="160" r="42" fill="url(#icon-fill-fl)"/>
+    <circle cx="112" cy="160" r="8" fill="#3A7BEF" fill-opacity="0.55"/>
+    <circle cx="95" cy="145" r="9" fill="#3A7BEF" fill-opacity="0.55"/>
+    <circle cx="130" cy="145" r="9" fill="#3A7BEF" fill-opacity="0.55"/>
+    <circle cx="93" cy="175" r="9" fill="#3A7BEF" fill-opacity="0.55"/>
+    <circle cx="132" cy="175" r="9" fill="#3A7BEF" fill-opacity="0.55"/>
+
+    <!-- clapperboard body -->
+    <rect x="158" y="140" width="80" height="66" rx="8" fill="url(#icon-fill-fl)"/>
+    <!-- clapper top (angled) -->
+    <g transform="translate(158,110) rotate(-14 40 12)">
+      <rect x="0" y="0" width="80" height="20" rx="5" fill="url(#icon-fill-fl)"/>
+      <rect x="6" y="0" width="10" height="20" fill="#3A7BEF" fill-opacity="0.55"/>
+      <rect x="26" y="0" width="10" height="20" fill="#3A7BEF" fill-opacity="0.55"/>
+      <rect x="46" y="0" width="10" height="20" fill="#3A7BEF" fill-opacity="0.55"/>
+      <rect x="66" y="0" width="10" height="20" fill="#3A7BEF" fill-opacity="0.55"/>
+    </g>
+  </g>
+
+  <!-- Label -->
+  <text x="150" y="242" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-weight="800" font-size="30" fill="#ffffff" letter-spacing="0.5">FILMES</text>
+</svg>

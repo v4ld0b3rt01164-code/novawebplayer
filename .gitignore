@@ -1,0 +1,21 @@
+# Dependencias (restauraveis com npm install)
+node_modules/
+
+# ATENCAO: backend/dist e frontend/dist SAO commitados de proposito
+# (restauracao imediata do checkpoint sem rebuild). Ver RESTORE_POINT.md.
+
+# Segredos / ambiente
+.env
+.env.*
+
+# Logs e temporarios
+*.log
+logs/
+
+# Artefatos acidentais do Windows
+nul
+Thumbs.db
+desktop.ini
+
+# macOS (caso o projeto seja aberto em outro SO)
+.DS_Store

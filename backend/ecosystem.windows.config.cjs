@@ -1,0 +1,35 @@
+module.exports = {
+  apps: [
+    {
+      name: 'nova-backend',
+      script: './dist/index.js',
+      cwd: __dirname,
+      instances: 1,
+      exec_mode: 'fork',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3001,
+      },
+      autorestart: true,
+      max_memory_restart: '500M',
+      watch: false,
+      max_restarts: 50,
+      min_uptime: '5s',
+      restart_delay: 3000,
+      exp_backoff_restart_delay: 100,
+    },
+    {
+      name: 'nova-tunnel',
+      script: 'cloudflared',
+      args: 'tunnel run novawebplayer',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_restarts: 50,
+      min_uptime: '5s',
+      restart_delay: 5000,
+      exp_backoff_restart_delay: 500,
+      max_memory_restart: '200M',
+    },
+  ],
+}
