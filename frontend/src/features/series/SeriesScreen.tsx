@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { createApiClient } from '../../api/client.js'
-import { seriesStreamUrl } from '../../api/streamUrl.js'
+import { seriesStreamUrl, seriesTranscodeUrl } from '../../api/streamUrl.js'
 import { ErrorState } from '../../shared/ErrorState.js'
 import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
@@ -80,6 +80,7 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
 
   if (view.type === 'player') {
     const streamUrl = seriesStreamUrl(view.episode.id, view.episode.container_extension, token)
+    const transcodeUrl = seriesTranscodeUrl(view.episode.id, view.episode.container_extension, token)
 
     if (view.maximized) {
       return (
@@ -89,7 +90,7 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
             onBack={() => setView({ ...view, maximized: false })}
           />
           <div className="relative w-full flex-1 bg-black">
-            <VideoPlayer src={streamUrl} title={view.episode.title} />
+            <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} />
             <button
               type="button"
               onClick={() => setView({ ...view, maximized: false })}
@@ -108,7 +109,7 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
     const playerBlock = (
       <div className="relative w-full overflow-hidden rounded-xl bg-black">
         <div className="aspect-video w-full">
-          <VideoPlayer src={streamUrl} title={view.episode.title} />
+          <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} />
         </div>
         <button
           type="button"

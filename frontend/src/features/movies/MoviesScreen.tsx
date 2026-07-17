@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { createApiClient } from '../../api/client.js'
-import { movieStreamUrl } from '../../api/streamUrl.js'
+import { movieStreamUrl, movieTranscodeUrl } from '../../api/streamUrl.js'
 import { ErrorState } from '../../shared/ErrorState.js'
 import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
@@ -54,11 +54,12 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
 
   if (view.type === 'movie' && maximized) {
     const streamUrl = movieStreamUrl(view.movie.stream_id, view.movie.container_extension, token)
+    const transcodeUrl = movieTranscodeUrl(view.movie.stream_id, view.movie.container_extension, token)
     return (
       <div className="flex min-h-full flex-col">
         <Header title={view.movie.name} onBack={() => { setMaximized(false); setView({ type: 'home' }) }} />
         <div className="relative w-full flex-1 bg-black">
-          <VideoPlayer src={streamUrl} title={view.movie.name} />
+          <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.movie.name} />
           <button
             type="button"
             onClick={() => setMaximized(false)}
@@ -76,6 +77,7 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
 
   if (view.type === 'movie') {
     const streamUrl = movieStreamUrl(view.movie.stream_id, view.movie.container_extension, token)
+    const transcodeUrl = movieTranscodeUrl(view.movie.stream_id, view.movie.container_extension, token)
     return (
       <div className="flex min-h-full flex-col">
         <Header title={view.movie.name} onBack={() => setView({ type: 'home' })} />
@@ -86,7 +88,7 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
           <div className="flex w-full flex-col gap-3 md:w-1/2 md:shrink-0">
             <div className="relative w-full overflow-hidden rounded-xl bg-black">
               <div className="aspect-video w-full">
-                <VideoPlayer src={streamUrl} title={view.movie.name} />
+                <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.movie.name} />
               </div>
               <button
                 type="button"

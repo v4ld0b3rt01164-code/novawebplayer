@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createApiClient } from '../../api/client.js'
-import { liveStreamUrl } from '../../api/streamUrl.js'
+import { liveStreamUrl, liveTranscodeUrl } from '../../api/streamUrl.js'
 import { ErrorState } from '../../shared/ErrorState.js'
 import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
@@ -72,7 +72,11 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
       <div className="flex min-h-full flex-col">
         <Header title={selectedChannel.name} onBack={() => { setMaximized(false); setSelectedChannel(null) }} />
         <div className="relative w-full flex-1 bg-black">
-          <VideoPlayer src={liveStreamUrl(selectedChannel.stream_id, token)} title={selectedChannel.name} />
+          <VideoPlayer
+            src={liveStreamUrl(selectedChannel.stream_id, token)}
+            fallbackSrc={liveTranscodeUrl(selectedChannel.stream_id, token)}
+            title={selectedChannel.name}
+          />
           <button
             type="button"
             onClick={() => setMaximized(false)}
@@ -116,7 +120,11 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
           <div className="flex min-h-0 w-full shrink-0 flex-col gap-3 overflow-hidden md:order-2 md:w-1/2">
             <div className="relative w-full overflow-hidden rounded-xl bg-black">
               <div className="aspect-video w-full">
-                <VideoPlayer src={liveStreamUrl(selectedChannel.stream_id, token)} title={selectedChannel.name} />
+                <VideoPlayer
+                  src={liveStreamUrl(selectedChannel.stream_id, token)}
+                  fallbackSrc={liveTranscodeUrl(selectedChannel.stream_id, token)}
+                  title={selectedChannel.name}
+                />
               </div>
               <button
                 type="button"

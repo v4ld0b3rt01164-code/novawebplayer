@@ -1,7 +1,7 @@
 # STATUS — NOVA Web Player
 
 Documento vivo do estado atual do projeto. Atualizado em: 2026-07-17
-(seguranca: path traversal corrigido + rate limiting + checkpoint git `checkpoint-2026-07-17`).
+(fallback automatico de transcode no player — checkpoint git `checkpoint-2026-07-17-transcode-fallback`).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
 ---
@@ -51,6 +51,8 @@ isolados no backend.
 | OPTIONS | `/stream/:type/:file` | sim | CORS preflight |
 | GET    | `/stream/:type/:file` | sim | proxy de playlist .m3u8 ou arquivo .mp4/.ts (com Range) |
 | GET    | `/stream/seg/:type/:file/:segment` | sim | proxy de segmento .ts (live) |
+| GET    | `/transcode/:type/:file` | sim | HLS transcodificado via ffmpeg (H.264/AAC) — fallback do player; responde SEMPRE .m3u8, mesmo com .mp4 no path |
+| GET    | `/transcode/seg/:type/:file/:segment` | sim | segmento do HLS transcodificado |
 
 ---
 
@@ -130,8 +132,19 @@ para buscar segmentos.
 - Detecta extensao do arquivo na URL.
 - `.m3u8` -> hls.js (Chrome/Firefox) ou nativo (Safari).
 - `.mp4`, `.mkv`, `.ts` -> `<video>` nativo direto.
+- URLs `/transcode/...` -> SEMPRE HLS, independente da extensao no path.
 - Auto-unmute apos playback iniciar.
 - Retry automatico em caso de erro de rede (ate 5x).
+- **Fallback automatico para `/transcode/...`** (prop `fallbackSrc`, 1x por
+  sessao de reproducao via `triedFallbackRef`), acionado por:
+  - erro do `<video>` code 3 (DECODE) ou 4 (SRC_NOT_SUPPORTED);
+  - hls.js MEDIA_ERROR fatal com retries esgotados, ou OTHER_ERROR fatal;
+  - **heuristica "toca mudo" (so WebKit/iOS)**: `webkitAudioDecodedByteCount`
+    igual a 0 apos 3s de reproducao ativa (desmutado, nao pausado,
+    currentTime avancando) — cobre video H.264 + audio AC3/EAC3 que o iOS
+    toca sem som e sem disparar erro.
+  - Tela de erro so aparece se a fonte direta E o transcode falharem;
+    "Tentar novamente" reseta para a fonte direta.
 - Media Session API para controles de lock screen.
 
 ---
@@ -223,6 +236,7 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **Home `/`, `/index.html`, SPA fallback (`/live` com F5): 200 com no-store**
 - **Assets `/assets/*`: 200 com cache 30d immutable**
 - **Rate limit login: 6 tentativas seguidas → 5x 401 + 1x 429**
+- **Fallback transcode: tsc -b --noEmit + build OK; teste de campo no iOS (AC3/EAC3) pendente**
 
 ---
 
@@ -254,4 +268,5 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - [ ] Chromecast/AirPlay (v2)
 - [ ] Testes automatizados (vitest backend, playwright frontend)
 - [ ] Layout responsivo avancado (grid dinamico para telas intermediarias)
-- [ ] Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3
+- [x] ~~Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3~~ (implementado: fallback automatico no player)
+- [ ] Limite de processos ffmpeg concorrentes (iptv/transcode.ts)

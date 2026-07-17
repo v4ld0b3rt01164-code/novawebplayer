@@ -1,8 +1,8 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-17 (atualizado - correcoes de seguranca: path traversal + rate limiting)
-**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream) — VALIDADO EM PRODUCAO
-**Checkpoint git**: tag `checkpoint-2026-07-17` (ver secao "Ponto de restauracao (git)" abaixo)
+**Data**: 2026-07-17 (atualizado - fallback automatico de transcode no player: iOS AC3/EAC3)
+**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode) — build/typecheck OK; teste de campo iOS pendente
+**Checkpoint git**: tag `checkpoint-2026-07-17-transcode-fallback` (anterior: `checkpoint-2026-07-17`) — ver secao "Ponto de restauracao (git)" abaixo
 **Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo). Botao flutuante usa `maximized: true` (mesmo padrao FILMES).
 
 ---
@@ -21,19 +21,26 @@ cd C:\Users\Valdo\Desktop\TUDO\SITES\DEV\NOVAWEBPLAYER
 
 # 1. Ver o que mudou desde o checkpoint (opcional)
 git status
-git diff checkpoint-2026-07-17
+git diff checkpoint-2026-07-17-transcode-fallback
 
 # 2. Guardar mudancas atuais em andamento (opcional, recuperavel depois)
 git stash push -u -m "antes de restaurar"
 
 # 3. Voltar TODO o codigo ao estado do checkpoint (descarta mudancas!)
-git reset --hard checkpoint-2026-07-17
+git reset --hard checkpoint-2026-07-17-transcode-fallback
 
 # 4. Restaurar dependencias exatas e reiniciar
 cd backend; npm install; cd ..
 cd frontend; npm install; cd ..
 scripts\windows\restart.bat
 ```
+
+**Checkpoints existentes** (do mais novo para o mais antigo):
+
+| Tag | Estado |
+|---|---|
+| `checkpoint-2026-07-17-transcode-fallback` | + fallback automatico /stream -> /transcode no player (iOS AC3/EAC3 + heuristica "toca mudo") |
+| `checkpoint-2026-07-17` | seguranca: path traversal corrigido + rate limiting + trustProxy |
 
 ### Criar um novo checkpoint (apos validar que tudo funciona)
 
@@ -100,6 +107,7 @@ commitado corresponder ao codigo-fonte.
 - [x] **Static serving seguro** (@fastify/static; path traversal bloqueado com 403)
 - [x] **Rate limiting** (300 req/min global + 5 req/min em POST /api/auth, por IP real via trustProxy)
 - [x] **index.html sempre no-store** (hook onSend forca em text/html; assets com hash mantem cache 30d)
+- [x] **Fallback automatico para transcode** (erro de codec no <video>/hls.js OU "toca mudo" no iOS/WebKit -> troca para /transcode/... ffmpeg H.264/AAC, 1x por sessao de reproducao)
 
 ---
 
@@ -136,9 +144,9 @@ NOVAWEBPLAYER/
 │   ├── src/
 │   │   ├── api/
 │   │   │   ├── client.ts               # HTTP client (fala so com backend)
-│   │   │   └── streamUrl.ts            # Gera URLs de stream com token
+│   │   │   └── streamUrl.ts            # URLs /stream/... + /transcode/... com token
 │   │   ├── player/
-│   │   │   └── VideoPlayer.tsx          # Player unificado (HLS + MP4)
+│   │   │   └── VideoPlayer.tsx          # Player unificado (HLS + MP4) + fallback transcode
 │   │   ├── features/
 │   │   │   ├── auth/LoginScreen.tsx
 │   │   │   ├── menu/MenuScreen.tsx
@@ -216,6 +224,35 @@ demais aguardam a mesma Promise.
 - `session/store.ts` — `blockedServers` Set + `updateSessionServer()`
 - `routes/stream.ts` — handlers envoltos com `withUpstreamFallback()`
 
+### Fallback de compatibilidade (transcode ffmpeg)
+
+Quando o NAVEGADOR (nao o upstream) nao consegue reproduzir a fonte
+direta `/stream/...`, o player troca automaticamente para
+`/transcode/...` (ffmpeg -> HLS H.264/AAC), uma unica vez por sessao de
+reproducao (`triedFallbackRef`):
+
+1. **Erro real de midia**: `error` do `<video>` com code 3
+   (MEDIA_ERR_DECODE) ou 4 (MEDIA_ERR_SRC_NOT_SUPPORTED); no hls.js,
+   MEDIA_ERROR fatal com retries esgotados ou OTHER_ERROR fatal.
+2. **Heuristica "toca mudo" (so WebKit/iOS)**: video H.264 + audio
+   AC3/EAC3 toca SEM erro no iOS, descartando o audio. Detectado via
+   `webkitAudioDecodedByteCount === 0` apos 3s de reproducao ativa
+   (desmutado, nao pausado, currentTime avancando). Propriedade so
+   existe no WebKit -> zero falso positivo em Chrome/Firefox/Android.
+
+A tela de erro so aparece se a fonte direta E o transcode falharem.
+"Tentar novamente" volta para a fonte direta (reseta a sessao).
+
+**IMPORTANTE**: `/transcode/:type/:file` responde SEMPRE playlist HLS,
+mesmo com `.mp4`/`.mkv` no path — o player trata qualquer URL
+`/transcode/` como HLS independente da extensao.
+
+**Arquivos envolvidos**:
+- `frontend/src/api/streamUrl.ts` — `liveTranscodeUrl()`, `movieTranscodeUrl()`, `seriesTranscodeUrl()`
+- `frontend/src/player/VideoPlayer.tsx` — prop `fallbackSrc`, `tryFallback()`, sonda de audio WebKit
+- `frontend/src/features/{live,movies,series}/*Screen.tsx` — passam `fallbackSrc` aos 7 `<VideoPlayer>`
+- `backend/src/iptv/transcode.ts` + `backend/src/routes/transcode.ts` — pipeline ffmpeg (ja existia)
+
 ---
 
 ## Configuracao
@@ -284,7 +321,7 @@ cd frontend && npm run build && cd ../backend && npm run build && pm2 restart no
 # Checkpoints (git)
 git tag                                  # listar checkpoints
 git log --oneline -10                    # ultimos commits
-git reset --hard checkpoint-2026-07-17   # RESTAURAR (descarta mudancas!)
+git reset --hard checkpoint-2026-07-17-transcode-fallback   # RESTAURAR (descarta mudancas!)
 ```
 
 ---
@@ -338,4 +375,5 @@ git reset --hard checkpoint-2026-07-17   # RESTAURAR (descarta mudancas!)
 - [ ] PWA manifest
 - [ ] Download offline (v2)
 - [ ] Chromecast/AirPlay (v2)
-- [ ] Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3
+- [x] ~~Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3~~ (implementado: fallback automatico no player via /transcode/...)
+- [ ] Limite de processos ffmpeg concorrentes em iptv/transcode.ts (risco de CPU se muitos fallbacks simultaneos)

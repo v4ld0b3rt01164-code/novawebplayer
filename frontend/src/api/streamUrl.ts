@@ -27,3 +27,35 @@ export function seriesStreamUrl(
 ): string {
   return `/stream/series/${episodeId}.${ext || 'mp4'}?token=${encodeURIComponent(token)}`
 }
+
+/**
+ * URLs de fallback via /transcode/... (pipeline ffmpeg do backend).
+ *
+ * Usadas pelo VideoPlayer quando o navegador reporta erro real de
+ * reprodução na URL /stream/... (ex.: áudio AC3/EAC3 no iOS, MP4 sem
+ * faststart). Mesmo padrão de path e token das funções acima.
+ *
+ * IMPORTANTE: a rota /transcode/:type/:file responde SEMPRE uma playlist
+ * HLS (H.264/AAC), mesmo quando o arquivo pedido termina em .mp4/.mkv —
+ * o player trata qualquer URL /transcode/ como HLS.
+ */
+
+export function liveTranscodeUrl(streamId: number, token: string): string {
+  return `/transcode/live/${streamId}.m3u8?token=${encodeURIComponent(token)}`
+}
+
+export function movieTranscodeUrl(
+  streamId: number,
+  ext: string,
+  token: string,
+): string {
+  return `/transcode/movie/${streamId}.${ext || 'mp4'}?token=${encodeURIComponent(token)}`
+}
+
+export function seriesTranscodeUrl(
+  episodeId: string,
+  ext: string,
+  token: string,
+): string {
+  return `/transcode/series/${episodeId}.${ext || 'mp4'}?token=${encodeURIComponent(token)}`
+}
