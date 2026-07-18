@@ -1,7 +1,7 @@
 # STATUS — NOVA Web Player
 
-Documento vivo do estado atual do projeto. Atualizado em: 2026-07-17
-(fallback automatico de transcode no player — checkpoint git `checkpoint-2026-07-17-transcode-fallback`).
+Documento vivo do estado atual do projeto. Atualizado em: 2026-07-18
+(player fixo no topo SeriesScreen desktop — checkpoint git `checkpoint-2026-07-18`).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
 ---

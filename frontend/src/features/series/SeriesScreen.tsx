@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { createApiClient } from '../../api/client.js'
-import { seriesStreamUrl, seriesTranscodeUrl } from '../../api/streamUrl.js'
+import { seriesStreamUrl } from '../../api/streamUrl.js'
 import { ErrorState } from '../../shared/ErrorState.js'
 import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
@@ -20,12 +20,6 @@ interface SeriesScreenProps {
   onBack: () => void
 }
 
-// O layout de Séries tinha duas árvores (desktop/mobile) alternadas só por
-// classes CSS "hidden"/"md:flex", então os DOIS <VideoPlayer> (dois <video>,
-// dois HLS.js) ficavam montados ao mesmo tempo. Isso confundia o fullscreen
-// nativo do <video> no mobile (o botão perto do controle de volume). Este
-// hook garante que só exista UM VideoPlayer montado por vez, igual ao
-// comportamento de FILMES.
 function useIsDesktopViewport() {
   const query = '(min-width: 768px)'
   const [isDesktop, setIsDesktop] = useState(
@@ -80,7 +74,6 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
 
   if (view.type === 'player') {
     const streamUrl = seriesStreamUrl(view.episode.id, view.episode.container_extension, token)
-    const transcodeUrl = seriesTranscodeUrl(view.episode.id, view.episode.container_extension, token)
 
     if (view.maximized) {
       return (
@@ -90,7 +83,7 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
             onBack={() => setView({ ...view, maximized: false })}
           />
           <div className="relative w-full flex-1 bg-black">
-            <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} />
+            <VideoPlayer src={streamUrl} title={view.episode.title} />
             <button
               type="button"
               onClick={() => setView({ ...view, maximized: false })}
@@ -109,7 +102,7 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
     const playerBlock = (
       <div className="relative w-full overflow-hidden rounded-xl bg-black">
         <div className="aspect-video w-full">
-          <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} />
+          <VideoPlayer src={streamUrl} title={view.episode.title} />
         </div>
         <button
           type="button"
@@ -134,15 +127,8 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
       </div>
     )
 
-    // IMPORTANTE: assim como em FILMES, este container NÃO usa "fixed inset-0".
-    // Um <video> com um ancestral "position: fixed" + "overflow: hidden" quebra
-    // o fullscreen NATIVO do navegador no mobile — o app pede fullscreen, o
-    // celular gira a tela, mas o vídeo continua preso dentro desse ancestral
-    // (por isso "gira e não maximiza"). Além disso, só é renderizada UMA
-    // árvore (desktop OU mobile) por vez, então existe sempre um único
-    // <video> montado — exatamente como em FILMES.
     return (
-      <div className="flex min-h-full flex-col">
+      <div className={isDesktop ? 'fixed inset-0 z-50 flex flex-col bg-bg' : 'flex min-h-full flex-col'}>
         <Header
           title={view.serie.name}
           onBack={() => setView({ type: 'detail', serie: view.serie, category: view.category })}
@@ -203,7 +189,6 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
           title={view.serie.name}
           onBack={() => setView({ type: 'series', category: view.category })}
         />
-        {/* Desktop: side by side */}
         <div className="hidden min-h-0 flex-1 flex-row gap-4 overflow-hidden p-4 md:flex">
           <div className="flex min-h-0 w-1/2 shrink-0 flex-col overflow-hidden">
             <SeriesDetailContent
@@ -224,7 +209,6 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
             </div>
           </div>
         </div>
-        {/* Mobile: vertical stack — poster top, player middle, episodes bottom */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
           <div className="shrink-0">
             <SeriesDetailContent

@@ -1,8 +1,8 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-17 (atualizado - fallback automatico de transcode no player: iOS AC3/EAC3)
-**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode) — build/typecheck OK; teste de campo iOS pendente
-**Checkpoint git**: tag `checkpoint-2026-07-17-transcode-fallback` (anterior: `checkpoint-2026-07-17`) — ver secao "Ponto de restauracao (git)" abaixo
+**Data**: 2026-07-18 (atualizado - player fixo no topo SeriesScreen desktop: fixed inset-0 z-50)
+**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode) — build/typecheck OK
+**Checkpoint git**: tag `checkpoint-2026-07-18` (anterior: `checkpoint-2026-07-17-transcode-fallback`) — ver secao "Ponto de restauracao (git)" abaixo
 **Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo). Botao flutuante usa `maximized: true` (mesmo padrao FILMES).
 
 ---
@@ -21,13 +21,13 @@ cd C:\Users\Valdo\Desktop\TUDO\SITES\DEV\NOVAWEBPLAYER
 
 # 1. Ver o que mudou desde o checkpoint (opcional)
 git status
-git diff checkpoint-2026-07-17-transcode-fallback
+git diff checkpoint-2026-07-18
 
 # 2. Guardar mudancas atuais em andamento (opcional, recuperavel depois)
 git stash push -u -m "antes de restaurar"
 
 # 3. Voltar TODO o codigo ao estado do checkpoint (descarta mudancas!)
-git reset --hard checkpoint-2026-07-17-transcode-fallback
+git reset --hard checkpoint-2026-07-18
 
 # 4. Restaurar dependencias exatas e reiniciar
 cd backend; npm install; cd ..
@@ -39,6 +39,7 @@ scripts\windows\restart.bat
 
 | Tag | Estado |
 |---|---|
+| `checkpoint-2026-07-18` | player fixo no topo SeriesScreen desktop (fixed inset-0 z-50) + useIsDesktopViewport evita 2 VideoPlayers |
 | `checkpoint-2026-07-17-transcode-fallback` | + fallback automatico /stream -> /transcode no player (iOS AC3/EAC3 + heuristica "toca mudo") |
 | `checkpoint-2026-07-17` | seguranca: path traversal corrigido + rate limiting + trustProxy |
 
@@ -321,7 +322,7 @@ cd frontend && npm run build && cd ../backend && npm run build && pm2 restart no
 # Checkpoints (git)
 git tag                                  # listar checkpoints
 git log --oneline -10                    # ultimos commits
-git reset --hard checkpoint-2026-07-17-transcode-fallback   # RESTAURAR (descarta mudancas!)
+git reset --hard checkpoint-2026-07-18   # RESTAURAR (descarta mudancas!)
 ```
 
 ---
