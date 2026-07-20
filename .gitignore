@@ -8,6 +8,9 @@ node_modules/
 .env
 .env.*
 
+# Dados de sessão do backend (persistidos em disco, específicos de cada instância)
+backend/sessions.json
+
 # Logs e temporarios
 *.log
 logs/

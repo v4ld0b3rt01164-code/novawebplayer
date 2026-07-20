@@ -63,6 +63,8 @@ atualizar este arquivo.
     /routes           -> rotas HTTP expostas em novawebplayer.app/api/* e /stream/*
     /session          -> gestão de sessão do usuário logado -> servidor ativo
                         (+ blockedServers Set + updateSessionServer)
+                        Sessões persistidas em disco (backend/sessions.json)
+                        para sobreviverem a restarts do backend.
 ```
 
 ## Regras de implementação (obrigatórias)
@@ -156,6 +158,16 @@ Pré-requisitos: `pm2` e `cloudflared` instalados, backend e frontend buildados.
 1. Edite `scripts/windows/config.bat` e defina `TUNNEL_NAME`.
 2. Rode uma vez: `scripts/windows/install-startup.bat`
 3. Controle manual: `start.bat`, `stop.bat`, `restart.bat`.
+
+O `install-startup.bat` cria 3 tarefas no Task Scheduler:
+- **NOVA Start**: inicia backend+tunnel no logon do Windows.
+- **NOVA Watchdog**: verifica saúde a cada 2 minutos (`watchdog.ps1`).
+- **NOVA Periodic Restart**: reinicia o tunnel a cada 8 horas
+  (`periodic-restart.ps1`) para evitar estados inconsistentes. Se o backend
+  estiver healthy, reinicia apenas o tunnel (sessões em memória preservadas).
+  Se unhealthy, reinicia tudo (sessões sobrevivem em disco via
+  `backend/sessions.json`). Esse reset é preventivo — não substitui o
+  watchdog, que continua detectando quedas imediatas.
 
 Veja `scripts/windows/README.md` para detalhes.
 

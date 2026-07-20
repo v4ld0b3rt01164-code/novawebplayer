@@ -40,11 +40,30 @@ if errorlevel 1 (
 )
 
 echo.
+echo [3/3] Criando tarefa: NOVA Periodic Restart (reset a cada 8h)...
+schtasks /Delete /TN "NOVA Web Player - Periodic Restart" /F 2>nul
+schtasks /Create /TN "NOVA Web Player - Periodic Restart" ^
+    /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"%~dp0periodic-restart.ps1\"" ^
+    /SC DAILY ^
+    /MO 1 ^
+    /ST 00:00 ^
+    /RI 480 ^
+    /DU 24:00 ^
+    /RL HIGHEST ^
+    /F
+if errorlevel 1 (
+    echo      ERRO ao criar tarefa de restart periodico.
+) else (
+    echo      Tarefa criada com sucesso.
+)
+
+echo.
 echo ========================================
 echo Instalacao concluida!
 echo.
 echo - NOVA Start: inicia backend+tunnel no logon
 echo - NOVA Watchdog: verifica saude a cada 2 min
+echo - NOVA Periodic Restart: reinicia tudo a cada 8h
 echo.
 echo Para desinstalar: uninstall-startup.bat
 echo ========================================

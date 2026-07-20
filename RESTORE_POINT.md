@@ -1,6 +1,6 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-18 (atualizado - player fixo no topo SeriesScreen desktop: fixed inset-0 z-50)
+**Data**: 2026-07-19 (atualizado - sessoes persistidas em disco, restart periodico inteligente)
 **Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode) — build/typecheck OK
 **Checkpoint git**: tag `checkpoint-2026-07-18` (anterior: `checkpoint-2026-07-17-transcode-fallback`) — ver secao "Ponto de restauracao (git)" abaixo
 **Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo). Botao flutuante usa `maximized: true` (mesmo padrao FILMES).
@@ -81,7 +81,7 @@ commitado corresponder ao codigo-fonte.
 | Backend | Node.js + Fastify 5 + TypeScript 6 |
 | Player | `<video>` nativo + hls.js (live) |
 | Deploy | PM2 + Cloudflare Tunnel |
-| Auth | UUID token em memoria (24h TTL) |
+| Auth | UUID token persistido em disco (24h TTL) |
 
 ## O que funciona
 
@@ -109,6 +109,7 @@ commitado corresponder ao codigo-fonte.
 - [x] **Rate limiting** (300 req/min global + 5 req/min em POST /api/auth, por IP real via trustProxy)
 - [x] **index.html sempre no-store** (hook onSend forca em text/html; assets com hash mantem cache 30d)
 - [x] **Fallback automatico para transcode** (erro de codec no <video>/hls.js OU "toca mudo" no iOS/WebKit -> troca para /transcode/... ffmpeg H.264/AAC, 1x por sessao de reproducao)
+- [x] **Sessao persistida em disco** (sessions.json com debounced write, sobrevive a restarts do backend)
 
 ---
 
@@ -138,7 +139,7 @@ NOVAWEBPLAYER/
 │   │   │   ├── epg.ts                  # /api/epg/*
 │   │   │   └── middleware.ts           # requireAuth
 │   │   └── session/
-│   │       └── store.ts                # Sessoes em memoria (+ blockedServers + updateSessionServer)
+│   │       └── store.ts                # Sessoes persistidas em disco (sessions.json) + blockedServers + updateSessionServer
 │   ├── ecosystem.windows.config.cjs    # PM2 config (Windows)
 │   └── dist/                           # Build do backend
 ├── frontend/
@@ -167,7 +168,8 @@ NOVAWEBPLAYER/
 │   ├── start-hidden.bat                # Inicio silencioso
 │   ├── install-startup.bat             # Task Scheduler
 │   ├── uninstall-startup.bat           # Remove Task Scheduler
-│   └── watchdog.ps1                    # Monitor PowerShell
+│   ├── watchdog.ps1                    # Monitor PowerShell
+│   └── periodic-restart.ps1            # Restart inteligente (tunnel a cada 8h)
 ├── AGENTS.md                           # Regras para agentes de cod
 ├── PRD.md                              # Requisitos do projeto
 ├── SCRIPTS.md                          # Docs dos scripts Windows

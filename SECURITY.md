@@ -1,8 +1,9 @@
 # SECURITY.md — NOVA Web Player
 
 Documento de seguranca do projeto. Criado em: 2026-07-17.
-Ultima atualizacao: 2026-07-17 (achados 1-4 implementados + achados 7-8:
-path traversal corrigido e rate limiting implementado).
+Ultima atualizacao: 2026-07-19 (achados 1-4 implementados + achados 7-8:
+path traversal corrigido e rate limiting implementado + achado 6:
+sessoes persistidas em disco).
 Baseado em auditoria completa do codigo-fonte (frontend + backend).
 
 ---
@@ -178,21 +179,21 @@ requer reformulacao significativa e nao compativel com todos os browsers.
 
 ---
 
-### 6. Sessoes em memoria
+### 6. Sessoes em memoria — IMPLEMENTADO
 
 **Severidade**: INFORMATIVA
-**Arquivos**: `backend/src/session/store.ts:13`
+**Arquivos**: `backend/src/session/store.ts`
+**Data da correcao**: 2026-07-19
 
-**Problema**: Sessoes ficam em um `Map` em memoria do processo.
+**Problema**: Sessoes ficavam em um `Map` em memoria do processo.
 Todas sao perdidas no restart do servidor. Nao escala horizontalmente.
 
-**Por que e aceitavel**: Deploy local (maquina do autor via Cloudflare Tunnel),
-processo unico gerenciado por PM2. Nao e SaaS multi-tenant.
+**Correcao aplicada**: Sessoes sao persistidas em disco (`backend/sessions.json`)
+com debounced write (1s). Na inicializacao, sessoes sao carregadas do disco.
+Sessoes expiradas sao descartadas no load. Sobrevivem a restarts do backend,
+PM2 e watchdog.
 
-**Correcao proposta**: Nenhuma necessaria para o caso atual.
-Se no futuro precisar de persistencia, usar SQLite ou Redis.
-
-**Recomendacao**: Manter como esta.
+**Status**: ✅ Implementado.
 
 ---
 
@@ -268,7 +269,7 @@ IPTV upstream usando o proprio servidor como proxy.
 | 3. CORS wildcard | Baixa/Media | ✅ Implementado | ALLOWED_ORIGIN env var em index.ts |
 | 4. Headers de seguranca | Baixa | ✅ Parcial | 5/6 headers em onSend hook. CSP pendente |
 | 5. Token na query string | Baixa | ⏸️ Mantido | Trade-off necessario para player nativo |
-| 6. Sessoes em memoria | Informativa | ⏸️ Mantido | Aceitavel para deploy local |
+| 6. Sessoes em memoria | Informativa | ✅ Implementado | Persistencia em disco (sessions.json) com debounced write |
 | 7. Path traversal no static serving | Alta | ✅ Implementado | @fastify/static + rota / explicita + SPA fallback fixo |
 | 8. Sem rate limiting | Media | ✅ Implementado | @fastify/rate-limit: 300/min global + 5/min no login + trustProxy |
 
@@ -283,7 +284,7 @@ Pendencia adicional conhecida: limite de processos ffmpeg concorrentes em
 
 1. Frontend nunca fala diretamente com dominios IPTV.
 2. Credenciais so trafegam em `POST /api/auth` (backend para IPTV).
-3. Token UUID opaco (gerado via `randomUUID()`), TTL 24h, em memoria.
+3. Token UUID opaco (gerado via `randomUUID()`), TTL 24h, persistido em disco.
 4. Nenhum uso de localStorage/sessionStorage para dados sensiveis.
 5. Mensagens de erro nao expoe senha, dominio ou detalhes do servidor.
 6. Dominios IPTV ficam em um unico arquivo (`servers.ts`), nao espalhados.

@@ -45,7 +45,11 @@ Execute **uma vez** com privilégios normais:
 .\scripts\windows\install-startup.bat
 ```
 
-Isso cria um atalho na pasta `Inicialização` do usuário. O servidor + túnel subirão automaticamente sempre que você fizer logon.
+Isso cria 3 tarefas no Task Scheduler:
+
+- **NOVA Start**: inicia backend+tunnel no logon do Windows.
+- **NOVA Watchdog**: verifica saúde a cada 2 minutos, reinicia se offline.
+- **NOVA Periodic Restart**: reinicia o tunnel a cada 8 horas. Se o backend estiver healthy, reinicia apenas o tunnel (sessões preservadas). Se unhealthy, reinicia tudo.
 
 Para remover:
 

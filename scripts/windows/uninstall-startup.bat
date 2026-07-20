@@ -26,6 +26,15 @@ if errorlevel 1 (
 )
 
 echo.
+echo [3/3] Removendo tarefa: NOVA Periodic Restart...
+schtasks /Delete /TN "NOVA Web Player - Periodic Restart" /F 2>nul
+if errorlevel 1 (
+    echo      Nao encontrada ou ja removida.
+) else (
+    echo      Removida.
+)
+
+echo.
 echo ========================================
 echo Auto-inicializacao desinstalada.
 echo ========================================

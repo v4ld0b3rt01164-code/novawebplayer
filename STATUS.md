@@ -1,7 +1,7 @@
 # STATUS — NOVA Web Player
 
-Documento vivo do estado atual do projeto. Atualizado em: 2026-07-18
-(player fixo no topo SeriesScreen desktop — checkpoint git `checkpoint-2026-07-18`).
+Documento vivo do estado atual do projeto. Atualizado em: 2026-07-19
+(sessoes persistidas em disco, restart periodico inteligente).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
 ---
@@ -24,7 +24,7 @@ isolados no backend.
 | Player   | `<video>` nativo + hls.js (live) |
 | Data     | React Query 5 |
 | XMLTV    | fast-xml-parser 5 (backend, cache 30 min) |
-| Sessao   | Memoria + token UUID (TTL 24h) |
+| Sessao   | Persistida em disco + token UUID (TTL 24h) |
 | Operacao | PM2 7 (local), Cloudflare Tunnel (publico), scripts Windows `.bat` |
 
 ---
@@ -237,6 +237,7 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **Assets `/assets/*`: 200 com cache 30d immutable**
 - **Rate limit login: 6 tentativas seguidas → 5x 401 + 1x 429**
 - **Fallback transcode: tsc -b --noEmit + build OK; teste de campo no iOS (AC3/EAC3) pendente**
+- **Sessao persistida em disco (sessions.json): OK**
 
 ---
 
