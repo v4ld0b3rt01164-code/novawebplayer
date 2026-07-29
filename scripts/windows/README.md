@@ -57,6 +57,17 @@ Para remover:
 .\scripts\windows\uninstall-startup.bat
 ```
 
+## Atalho na área de trabalho
+
+Para criar um atalho na área de trabalho que execute um dos scripts:
+
+1. Clique com botão direito na área de trabalho → **Novo** → **Atalho**.
+2. Aponte para o `.bat` desejado (ex.: `scripts\windows\restart.bat`).
+3. Dê um nome (ex.: "NOVA Restart").
+4. **Importante:** Não marque "Executar como administrador" — isso mudaria a sessão Windows e causaria o erro `EPERM \\.\pipe\rpc.sock` no PM2.
+
+Se o atalho já existir e der o erro `EPERM`, verifique as propriedades do atalho e desmarque "Executar como administrador" se estiver habilitado.
+
 ## Observações
 
 - O frontend é servido pelo próprio backend a partir de `backend/../frontend/dist` (mesma origem HTTPS: `novawebplayer.app`). Por isso, em produção, **não é necessário iniciar o Vite separadamente**.

@@ -1,7 +1,7 @@
 # STATUS — NOVA Web Player
 
-Documento vivo do estado atual do projeto. Atualizado em: 2026-07-19
-(sessoes persistidas em disco, restart periodico inteligente).
+Documento vivo do estado atual do projeto. Atualizado em: 2026-07-29
+(iPhone VOD fix: iOS WebKit redireciona VOD nao-HLS direto para /transcode; SeriesScreen agora passa fallbackSrc).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
 ---
@@ -75,6 +75,13 @@ isolados no backend.
 4. Backend retorna stream com headers `Accept-Ranges: bytes`
 5. Browser usa `<video>` nativo (sem hls.js)
 
+**NOTA iOS (2026-07-29)**: No iOS Safari, o VideoPlayer detecta automaticamente
+a ausencia de MSE (`!Hls.isSupported()`) com suporte a HLS nativo e redireciona
+VOD nao-HLS (.mp4/.mkv) direto para `/transcode/...` (ffmpeg H.264/AAC HLS),
+evitando completamente a deteccao nao-conflavel de erro de codec no iOS. O
+fallback reativo (onerror, webkitAudioDecodedByteCount) continua ativo para
+macOS Safari e outros cenarios.
+
 ### Descoberta do servidor real
 
 O Cloudflare bloqueia requests GET para `/hls/...` (retorna 403/404).
@@ -132,6 +139,12 @@ para buscar segmentos.
 - Detecta extensao do arquivo na URL.
 - `.m3u8` -> hls.js (Chrome/Firefox) ou nativo (Safari).
 - `.mp4`, `.mkv`, `.ts` -> `<video>` nativo direto.
+- **iOS WebKit redirect (2026-07-29)**: Se `!Hls.isSupported()` (iOS Safari sem
+  MSE) + source nao-HLS com `fallbackSrc` disponivel, o player redireciona
+  automaticamente para o transcode (`/transcode/...`) ANTES de tentar o proxy
+  direto. Isso resolve o erro "formato nao suportado" no iPhone para VOD com
+  codecs incompatíveis (HEVC, AC3, MKV, etc.). macOS Safari (tem MSE) e live
+  (.m3u8) nao sao afetados.
 - URLs `/transcode/...` -> SEMPRE HLS, independente da extensao no path.
 - Auto-unmute apos playback iniciar.
 - Retry automatico em caso de erro de rede (ate 5x).
@@ -236,8 +249,9 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **Home `/`, `/index.html`, SPA fallback (`/live` com F5): 200 com no-store**
 - **Assets `/assets/*`: 200 com cache 30d immutable**
 - **Rate limit login: 6 tentativas seguidas → 5x 401 + 1x 429**
-- **Fallback transcode: tsc -b --noEmit + build OK; teste de campo no iOS (AC3/EAC3) pendente**
+- **Fallback transcode: tsc -b --noEmit + build OK; validado em iPhone (usuario real) — 2026-07-29**
 - **Sessao persistida em disco (sessions.json): OK**
+- **VOD iPhone (filmes + series): OK — iOS WebKit redirect para /transcode validado por usuario iPhone**
 
 ---
 
@@ -269,5 +283,6 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - [ ] Chromecast/AirPlay (v2)
 - [ ] Testes automatizados (vitest backend, playwright frontend)
 - [ ] Layout responsivo avancado (grid dinamico para telas intermediarias)
-- [x] ~~Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3~~ (implementado: fallback automatico no player)
+- [x] ~~Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3~~ (implementado: fallback automatico no player + iOS WebKit redirect)
+- [x] ~~VOD iPhone (filmes/series) — iOS WebKit redirect para /transcode~~ (validado por usuario iPhone 2026-07-29)
 - [ ] Limite de processos ffmpeg concorrentes (iptv/transcode.ts)

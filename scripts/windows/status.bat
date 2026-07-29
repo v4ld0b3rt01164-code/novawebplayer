@@ -4,6 +4,7 @@ title NOVA Web Player - Status
 
 set "BACKEND_DIR=%~dp0..\..\backend"
 set "FRONTEND_DIR=%~dp0..\..\frontend"
+set "PM2_HOME=%USERPROFILE%\.pm2"
 
 echo.
 echo ========================================

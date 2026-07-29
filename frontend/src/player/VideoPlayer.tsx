@@ -74,7 +74,23 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
     setLoading(true)
     retryCountRef.current = 0
 
-    const url = activeSrcRef.current || src
+    let url = activeSrcRef.current || src
+
+    // iOS Safari não suporta MSE (hls.js) e frequentemente não consegue
+    // decodificar VOD não-HLS (MP4/MKV com codecs incompatíveis).
+    // Redireciona para o pipeline de transcode (H.264/AAC HLS) imediatamente.
+    const isIOSWebKit =
+      !Hls.isSupported() &&
+      typeof document !== 'undefined' &&
+      !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl')
+
+    if (isIOSWebKit && fallbackSrc) {
+      const cp = url.split('?')[0]
+      if (!cp.endsWith('.m3u8') && !cp.startsWith('/transcode/')) {
+        url = fallbackSrc
+      }
+    }
+
     const cleanPath = url.split('?')[0]
     const ext = cleanPath.split('.').pop()?.toLowerCase() ?? ''
     // /transcode/... responde SEMPRE playlist HLS, mesmo com extensão
