@@ -1,7 +1,7 @@
 # STATUS — NOVA Web Player
 
 Documento vivo do estado atual do projeto. Atualizado em: 2026-07-29
-(iPhone VOD fix: iOS WebKit redireciona VOD nao-HLS direto para /transcode; SeriesScreen agora passa fallbackSrc).
+(Favoritos: categoria dentro de Live, Movies e Series com persistencia localStorage).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
 ---
@@ -107,6 +107,13 @@ para buscar segmentos.
 - **Mobile**: 3 colunas lado a lado, SVG 80px, texto base, visiveis todos sem scroll.
 - Botao "Sair" limpa o contexto e o cache do React Query.
 
+### Favoritos
+- Disponivel como **primeira categoria** dentro de TV AO VIVO, FILMES e SERIES & NOVELAS.
+- Botao de coracao (coracao outline/preenchido) em cada card de canal/filme/serie.
+- Dados persistidos no `localStorage` (chave `nova-favorites`).
+- Cada categoria Favoritos mostra contagem de itens.
+- Ao clicar, filtra e mostra apenas itens marcados com coracao.
+
 ### TV AO VIVO
 - Categorias -> Canais -> Player.
 - **Auto-play**: ao entrar em uma pasta, o primeiro canal e selecionado automaticamente e o player comeca a reproduzir.
@@ -167,7 +174,7 @@ para buscar segmentos.
 - Dominios IPTV **so no backend** (`backend/src/iptv/servers.ts`).
 - Credenciais **nunca** vao para o frontend. So trafegam em `POST /api/auth`.
 - Backend associa o servidor ativo ao token UUID em memoria (TTL 24h).
-- `localStorage`/`sessionStorage` **nao sao usados**.
+- `localStorage` usado **apenas** para favoritos (IDs de itens, nao dados sensiveis).
 - Erros de login nao mencionam senha ou dominio.
 - **Static serving via @fastify/static** (root fixo em `frontend/dist`;
   path traversal com `..` retorna 403). Nenhum caminho de arquivo e
@@ -243,6 +250,9 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **Botao maximizar series mobile: so rotaciona tela (pendente fullscreen nativo)**
 - Menu responsivo (sem moldura, 3 colunas mobile): OK
 - Busca em filmes e series: OK
+- **Favoritos: categoria dentro de Live, Movies e Series — OK**
+- **Botao de coracao em todos os cards — OK**
+- **Persistencia de favoritos no localStorage — OK**
 - Scripts Windows (start/stop/restart/status): OK
 - Auto-inicializacao via Task Scheduler: OK
 - **Path traversal (`--path-as-is` e `%2e%2e`): 403 bloqueado (validado em producao)**
@@ -275,6 +285,7 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - [x] ~~Layout split fixo para TV/series~~ (implementado: fixed inset-0 z-50)
 - [x] ~~Auto-play primeiro canal~~ (implementado: useEffect + useRef)
 - [x] ~~Layout mobile series (poster+player+episodios)~~ (implementado: renderMode)
+- [x] ~~Favoritos~~ (implementado: categoria dentro de Live, Movies e Series com persistencia localStorage)
 - [ ] **Fullscreen nativo no mobile** (requestFullscreen API no video — pendente)
 - [ ] EPG completo (xmltv parsing mais robusto)
 - [ ] Fallback de catalogo (categories/VOD) — mesma arquitetura de reauth.ts

@@ -44,6 +44,7 @@ atualizar este arquivo.
     /player       -> componentes de vídeo (LivePlayer, VodPlayer)
     /features
       /auth       -> tela de login
+      /favorites  -> hook useFavorites, FavoriteButton, FavoritesScreen
       /live       -> TV ao vivo (categorias, canais, EPG)
       /movies     -> Filmes (VOD)
       /series     -> Séries & Novelas (plataformas, temporadas, episódios)
