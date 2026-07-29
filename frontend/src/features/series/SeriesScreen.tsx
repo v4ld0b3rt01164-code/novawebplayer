@@ -7,6 +7,8 @@ import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
 import { VideoPlayer } from '../../player/VideoPlayer.js'
 import { useAuth } from '../auth/useAuth.js'
+import { FavoriteButton } from '../favorites/FavoriteButton.js'
+import { useFavorites } from '../favorites/useFavorites.js'
 import type {
   SeriesCategoriesResponse,
   SeriesListResponse,
@@ -15,6 +17,12 @@ import type {
   XtreamSeries,
   XtreamSeriesInfoResponse,
 } from '../../types/index.js'
+
+const FAVORITES_CATEGORY: XtreamCategory = {
+  category_id: '__favorites__',
+  category_name: 'Favoritos',
+  parent_id: 0,
+}
 
 interface SeriesScreenProps {
   onBack: () => void
@@ -51,6 +59,7 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
   const [view, setView] = useState<ViewState>({ type: 'categories' })
   const [globalSearch, setGlobalSearch] = useState('')
   const isDesktop = useIsDesktopViewport()
+  const { favorites } = useFavorites()
 
   const categoriesQuery = useQuery({
     queryKey: ['series', 'categories'],
@@ -60,7 +69,7 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
   const allQuery = useQuery({
     queryKey: ['series', 'all'],
     queryFn: () => api.get<SeriesListResponse>('/api/series'),
-    enabled: globalSearch.trim().length >= 2,
+    enabled: globalSearch.trim().length >= 2 || view.type === 'series' && view.category.category_id === '__favorites__',
     staleTime: 5 * 60_000,
   })
 
@@ -249,6 +258,8 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
       <SeriesGrid
         category={view.category}
         api={api}
+        favorites={favorites.series}
+        allQuery={allQuery}
         onBack={() => setView({ type: 'categories' })}
         onSelect={(serie) =>
           setView({ type: 'detail', serie, category: view.category })
@@ -311,6 +322,26 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
           )}
           {categoriesQuery.data && (
             <div className="grid gap-2 p-4">
+              <button
+                type="button"
+                onClick={() => setView({ type: 'series', category: FAVORITES_CATEGORY })}
+                className="flex items-center justify-between rounded-xl bg-surface p-4 text-left ring-1 ring-zinc-800 active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-red-500">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  <span className="font-medium">Favoritos</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {favorites.series.length > 0 && (
+                    <span className="text-sm text-zinc-400">{favorites.series.length}</span>
+                  )}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </div>
+              </button>
               {categoriesQuery.data.categories.map((category) => (
                 <button
                   key={category.category_id}
@@ -363,6 +394,9 @@ function SerieCard({ serie, onClick }: SerieCardProps) {
             ;(e.target as HTMLImageElement).style.display = 'none'
           }}
         />
+        <div className="absolute right-2 top-2">
+          <FavoriteButton type="series" id={serie.series_id} size="sm" />
+        </div>
       </div>
       <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight">
         {serie.name}
@@ -374,21 +408,36 @@ function SerieCard({ serie, onClick }: SerieCardProps) {
 interface SeriesGridProps {
   category: XtreamCategory
   api: ReturnType<typeof createApiClient>
+  favorites: number[]
+  allQuery: ReturnType<typeof useQuery<SeriesListResponse>>
   onBack: () => void
   onSelect: (serie: XtreamSeries) => void
 }
 
-function SeriesGrid({ category, api, onBack, onSelect }: SeriesGridProps) {
+function SeriesGrid({ category, api, favorites, allQuery, onBack, onSelect }: SeriesGridProps) {
+  const [search, setSearch] = useState('')
+  const isFavorites = category.category_id === '__favorites__'
+
   const query = useQuery({
     queryKey: ['series', 'list', category.category_id],
     queryFn: () =>
       api.get<SeriesListResponse>(
         `/api/series?category_id=${category.category_id}`,
       ),
+    enabled: !isFavorites,
   })
-  const [search, setSearch] = useState('')
 
-  const all = query.data?.series ?? []
+  const all = useMemo(() => {
+    if (isFavorites) {
+      if (!allQuery.data) return []
+      return allQuery.data.series.filter((s) => favorites.includes(s.series_id))
+    }
+    return query.data?.series ?? []
+  }, [isFavorites, allQuery.data, favorites, query.data])
+
+  const isLoading = isFavorites ? allQuery.isPending : query.isPending
+  const error = isFavorites ? allQuery.error : query.error
+
   const filtered = useMemo(() => {
     if (!search.trim()) return all
     const term = search.trim().toLowerCase()
@@ -407,14 +456,14 @@ function SeriesGrid({ category, api, onBack, onSelect }: SeriesGridProps) {
           className="w-full rounded-xl bg-surface px-4 py-3 text-zinc-100 placeholder-zinc-500 outline-none ring-1 ring-zinc-800 focus:ring-2 focus:ring-accent"
         />
       </div>
-      {query.isPending && <Loading />}
-      {query.isError && (
+      {isLoading && <Loading />}
+      {error && (
         <ErrorState
-          message={query.error?.message ?? 'Erro ao carregar series'}
-          onRetry={() => query.refetch()}
+          message={error?.message ?? 'Erro ao carregar series'}
+          onRetry={() => isFavorites ? allQuery.refetch() : query.refetch()}
         />
       )}
-      {query.data && (
+      {!isLoading && !error && (
         <>
           {filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-zinc-500">

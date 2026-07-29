@@ -8,6 +8,8 @@ import { Loading } from '../../shared/Loading.js'
 import { SectionTitle } from '../../shared/SectionTitle.js'
 import { VideoPlayer } from '../../player/VideoPlayer.js'
 import { useAuth } from '../auth/useAuth.js'
+import { FavoriteButton } from '../favorites/FavoriteButton.js'
+import { useFavorites } from '../favorites/useFavorites.js'
 import type {
   EpgData,
   LiveCategoriesResponse,
@@ -16,6 +18,12 @@ import type {
   XtreamLiveStream,
 } from '../../types/index.js'
 import { findNowNext, formatTime, getChannelEpg } from './epg.js'
+
+const FAVORITES_CATEGORY: XtreamCategory = {
+  category_id: '__favorites__',
+  category_name: 'Favoritos',
+  parent_id: 0,
+}
 
 interface LiveScreenProps {
   onBack: () => void
@@ -31,11 +39,14 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
   const [selectedChannel, setSelectedChannel] =
     useState<XtreamLiveStream | null>(null)
   const [maximized, setMaximized] = useState(false)
+  const { favorites } = useFavorites()
 
   const categoriesQuery = useQuery({
     queryKey: ['live', 'categories'],
     queryFn: () => api.get<LiveCategoriesResponse>('/api/live/categories'),
   })
+
+  const isFavorites = selectedCategory?.category_id === '__favorites__'
 
   const streamsQuery = useQuery({
     queryKey: ['live', 'streams', selectedCategory?.category_id],
@@ -43,17 +54,33 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
       api.get<LiveStreamsResponse>(
         `/api/live/streams?category_id=${selectedCategory?.category_id}`,
       ),
-    enabled: !!selectedCategory,
+    enabled: !!selectedCategory && !isFavorites,
   })
+
+  const allStreamsQuery = useQuery({
+    queryKey: ['live', 'all-streams'],
+    queryFn: () => api.get<LiveStreamsResponse>('/api/live/streams'),
+    enabled: isFavorites,
+    staleTime: 5 * 60_000,
+  })
+
+  const favoriteStreams = useMemo(() => {
+    if (!isFavorites || !allStreamsQuery.data) return []
+    return allStreamsQuery.data.streams.filter((s) => favorites.live.includes(s.stream_id))
+  }, [isFavorites, allStreamsQuery.data, favorites.live])
+
+  const effectiveStreams = isFavorites
+    ? { streams: favoriteStreams }
+    : streamsQuery.data
 
   const autoSelectDone = useRef(false)
 
   useEffect(() => {
-    if (selectedCategory && streamsQuery.data && streamsQuery.data.streams.length > 0 && !selectedChannel && !autoSelectDone.current) {
+    if (selectedCategory && effectiveStreams && effectiveStreams.streams.length > 0 && !selectedChannel && !autoSelectDone.current) {
       autoSelectDone.current = true
-      setSelectedChannel(streamsQuery.data.streams[0])
+      setSelectedChannel(effectiveStreams.streams[0])
     }
-  }, [selectedCategory, streamsQuery.data, selectedChannel])
+  }, [selectedCategory, effectiveStreams, selectedChannel])
 
   useEffect(() => {
     if (!selectedCategory) {
@@ -98,7 +125,10 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
   const channelList = selectedCategory ? (
     <ChannelListView
       category={selectedCategory}
-      streamsQuery={streamsQuery}
+      streams={effectiveStreams}
+      isLoading={isFavorites ? allStreamsQuery.isPending : streamsQuery.isPending}
+      error={isFavorites ? allStreamsQuery.error : streamsQuery.error}
+      onRetry={isFavorites ? () => allStreamsQuery.refetch() : () => streamsQuery.refetch()}
       epgData={epgQuery.data}
       onSelectChannel={setSelectedChannel}
       onBack={() => setSelectedCategory(null)}
@@ -107,6 +137,7 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
   ) : (
     <CategoryListView
       categoriesQuery={categoriesQuery}
+      favoritesCount={favorites.live.length}
       onSelectCategory={setSelectedCategory}
       onBack={onBack}
     />
@@ -154,11 +185,12 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
 
 interface CategoryListViewProps {
   categoriesQuery: ReturnType<typeof useQuery<LiveCategoriesResponse>>
+  favoritesCount: number
   onSelectCategory: (c: XtreamCategory) => void
   onBack: () => void
 }
 
-function CategoryListView({ categoriesQuery, onSelectCategory, onBack }: CategoryListViewProps) {
+function CategoryListView({ categoriesQuery, favoritesCount, onSelectCategory, onBack }: CategoryListViewProps) {
   return (
     <div className="flex min-h-full flex-col">
       <Header title="TV AO VIVO" onBack={onBack} />
@@ -171,6 +203,26 @@ function CategoryListView({ categoriesQuery, onSelectCategory, onBack }: Categor
       )}
       {categoriesQuery.data && (
         <div className="grid gap-2 p-4">
+          <button
+            type="button"
+            onClick={() => onSelectCategory(FAVORITES_CATEGORY)}
+            className="flex items-center justify-between rounded-xl bg-surface p-4 text-left ring-1 ring-zinc-800 active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-red-500">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+              <span className="font-medium">Favoritos</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {favoritesCount > 0 && (
+                <span className="text-sm text-zinc-400">{favoritesCount}</span>
+              )}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+          </button>
           {categoriesQuery.data.categories.map((category) => (
             <button
               key={category.category_id}
@@ -201,27 +253,33 @@ function CategoryListView({ categoriesQuery, onSelectCategory, onBack }: Categor
 
 interface ChannelListViewProps {
   category: XtreamCategory
-  streamsQuery: ReturnType<typeof useQuery<LiveStreamsResponse>>
+  streams: LiveStreamsResponse | undefined
+  isLoading: boolean
+  error: Error | null
   epgData: EpgData | undefined
   onSelectChannel: (c: XtreamLiveStream) => void
   onBack: () => void
+  onRetry: () => void
   compact?: boolean
 }
 
-function ChannelListView({ category, streamsQuery, epgData, onSelectChannel, onBack, compact }: ChannelListViewProps) {
+function ChannelListView({ category, streams, isLoading, error, epgData, onSelectChannel, onBack, onRetry, compact }: ChannelListViewProps) {
   return (
     <div className={`flex flex-col ${compact ? 'h-full' : 'min-h-full'}`}>
       <Header title={category.category_name} onBack={onBack} />
-      {streamsQuery.isPending && <Loading />}
-      {streamsQuery.isError && (
+      {isLoading && <Loading />}
+      {error && (
         <ErrorState
-          message={streamsQuery.error?.message ?? 'Erro ao carregar canais'}
-          onRetry={() => streamsQuery.refetch()}
+          message={error?.message ?? 'Erro ao carregar canais'}
+          onRetry={onRetry}
         />
       )}
-      {streamsQuery.data && (
+      {streams && (
         <div className="grid gap-2 p-4">
-          {streamsQuery.data.streams.map((stream) => (
+          {streams.streams.length === 0 && (
+            <p className="text-center text-sm text-zinc-500">Nenhum favorito nesta categoria.</p>
+          )}
+          {streams.streams.map((stream) => (
             <ChannelCard
               key={stream.stream_id}
               channel={stream}
@@ -273,6 +331,7 @@ function ChannelCard({ channel, epgData, onClick }: ChannelCardProps) {
           </p>
         )}
       </div>
+      <FavoriteButton type="live" id={channel.stream_id} size="sm" />
     </button>
   )
 }

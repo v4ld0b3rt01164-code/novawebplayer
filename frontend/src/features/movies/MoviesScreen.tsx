@@ -7,12 +7,20 @@ import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
 import { VideoPlayer } from '../../player/VideoPlayer.js'
 import { useAuth } from '../auth/useAuth.js'
+import { FavoriteButton } from '../favorites/FavoriteButton.js'
+import { useFavorites } from '../favorites/useFavorites.js'
 import type {
   VodCategoriesResponse,
   VodStreamsResponse,
   XtreamCategory,
   XtreamVodStream,
 } from '../../types/index.js'
+
+const FAVORITES_CATEGORY: XtreamCategory = {
+  category_id: '__favorites__',
+  category_name: 'Favoritos',
+  parent_id: 0,
+}
 
 interface MoviesScreenProps {
   onBack: () => void
@@ -31,6 +39,7 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
   const [view, setView] = useState<View>({ type: 'home' })
   const [globalSearch, setGlobalSearch] = useState('')
   const [maximized, setMaximized] = useState(false)
+  const { favorites } = useFavorites()
 
   const categoriesQuery = useQuery({
     queryKey: ['movies', 'categories'],
@@ -40,7 +49,7 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
   const allQuery = useQuery({
     queryKey: ['movies', 'all'],
     queryFn: () => api.get<VodStreamsResponse>('/api/movies/streams'),
-    enabled: globalSearch.trim().length >= 2,
+    enabled: globalSearch.trim().length >= 2 || view.type === 'category' && view.category.category_id === '__favorites__',
     staleTime: 5 * 60_000,
   })
 
@@ -112,6 +121,8 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
       <CategoryView
         category={view.category}
         api={api}
+        favorites={favorites.movies}
+        allQuery={allQuery}
         onBack={() => setView({ type: 'home' })}
         onSelectMovie={(movie) => setView({ type: 'movie', movie })}
       />
@@ -171,6 +182,26 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
           )}
           {categoriesQuery.data && (
             <div className="grid gap-2 p-4">
+              <button
+                type="button"
+                onClick={() => setView({ type: 'category', category: FAVORITES_CATEGORY })}
+                className="flex items-center justify-between rounded-xl bg-surface p-4 text-left ring-1 ring-zinc-800 active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-red-500">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  <span className="font-medium">Favoritos</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {favorites.movies.length > 0 && (
+                    <span className="text-sm text-zinc-400">{favorites.movies.length}</span>
+                  )}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </div>
+              </button>
               {categoriesQuery.data.categories.map((category) => (
                 <button
                   key={category.category_id}
@@ -204,6 +235,8 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
 interface CategoryViewProps {
   category: XtreamCategory
   api: ReturnType<typeof createApiClient>
+  favorites: number[]
+  allQuery: ReturnType<typeof useQuery<VodStreamsResponse>>
   onBack: () => void
   onSelectMovie: (movie: XtreamVodStream) => void
 }
@@ -211,19 +244,34 @@ interface CategoryViewProps {
 function CategoryView({
   category,
   api,
+  favorites,
+  allQuery,
   onBack,
   onSelectMovie,
 }: CategoryViewProps) {
   const [search, setSearch] = useState('')
+  const isFavorites = category.category_id === '__favorites__'
+
   const query = useQuery({
     queryKey: ['movies', 'streams', category.category_id],
     queryFn: () =>
       api.get<VodStreamsResponse>(
         `/api/movies/streams?category_id=${category.category_id}`,
       ),
+    enabled: !isFavorites,
   })
 
-  const all = query.data?.streams ?? []
+  const all = useMemo(() => {
+    if (isFavorites) {
+      if (!allQuery.data) return []
+      return allQuery.data.streams.filter((s) => favorites.includes(s.stream_id))
+    }
+    return query.data?.streams ?? []
+  }, [isFavorites, allQuery.data, favorites, query.data])
+
+  const isLoading = isFavorites ? allQuery.isPending : query.isPending
+  const error = isFavorites ? allQuery.error : query.error
+
   const filtered = useMemo(() => {
     if (!search.trim()) return all
     const term = search.trim().toLowerCase()
@@ -242,14 +290,14 @@ function CategoryView({
           className="w-full rounded-xl bg-surface px-4 py-3 text-zinc-100 placeholder-zinc-500 outline-none ring-1 ring-zinc-800 focus:ring-2 focus:ring-accent"
         />
       </div>
-      {query.isPending && <Loading />}
-      {query.isError && (
+      {isLoading && <Loading />}
+      {error && (
         <ErrorState
-          message={query.error?.message ?? 'Erro ao carregar filmes'}
-          onRetry={() => query.refetch()}
+          message={error?.message ?? 'Erro ao carregar filmes'}
+          onRetry={() => isFavorites ? allQuery.refetch() : query.refetch()}
         />
       )}
-      {query.data && (
+      {!isLoading && !error && (
         <>
           {filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-zinc-500">
@@ -294,6 +342,9 @@ function MovieCard({ movie, onClick }: MovieCardProps) {
             ;(e.target as HTMLImageElement).style.display = 'none'
           }}
         />
+        <div className="absolute right-2 top-2">
+          <FavoriteButton type="movies" id={movie.stream_id} size="sm" />
+        </div>
       </div>
       <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight">
         {movie.name}
