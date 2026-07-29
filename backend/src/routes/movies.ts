@@ -21,8 +21,19 @@ const movieRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
   app.get('/streams', async (req) => {
     const { category_id } = req.query as StreamsQuery
-    const streams = await catalog.getVodStreams(req.session!, category_id)
-    return { streams }
+    if (category_id) {
+      const streams = await catalog.getVodStreams(req.session!, category_id)
+      return { streams }
+    }
+    const categories = await catalog.getVodCategories(req.session!)
+    const allStreams: Awaited<ReturnType<typeof catalog.getVodStreams>> = []
+    const results = await Promise.allSettled(
+      categories.map((c) => catalog.getVodStreams(req.session!, c.category_id)),
+    )
+    for (const r of results) {
+      if (r.status === 'fulfilled') allStreams.push(...r.value)
+    }
+    return { streams: allStreams }
   })
 
   app.get('/:vod_id', async (req) => {
