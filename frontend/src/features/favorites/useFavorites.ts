@@ -9,6 +9,7 @@ interface Favorites {
 }
 
 const STORAGE_KEY = 'nova-favorites'
+const EVENT_NAME = 'nova-favorites-change'
 
 function loadFavorites(): Favorites {
   try {
@@ -29,35 +30,45 @@ function loadFavorites(): Favorites {
 
 function saveFavorites(favs: Favorites) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(favs))
+  window.dispatchEvent(new Event(EVENT_NAME))
 }
 
 export function useFavorites() {
   const [favorites, setFavorites] = useState<Favorites>(loadFavorites)
 
   useEffect(() => {
-    saveFavorites(favorites)
-  }, [favorites])
+    const handler = () => setFavorites(loadFavorites())
+    window.addEventListener(EVENT_NAME, handler)
+    return () => window.removeEventListener(EVENT_NAME, handler)
+  }, [])
 
   const addFavorite = useCallback((type: FavoriteType, id: number) => {
     setFavorites((prev) => {
       if (prev[type].includes(id)) return prev
-      return { ...prev, [type]: [...prev[type], id] }
+      const next = { ...prev, [type]: [...prev[type], id] }
+      saveFavorites(next)
+      return next
     })
   }, [])
 
   const removeFavorite = useCallback((type: FavoriteType, id: number) => {
-    setFavorites((prev) => ({
-      ...prev,
-      [type]: prev[type].filter((x) => x !== id),
-    }))
+    setFavorites((prev) => {
+      const next = { ...prev, [type]: prev[type].filter((x) => x !== id) }
+      saveFavorites(next)
+      return next
+    })
   }, [])
 
   const toggleFavorite = useCallback((type: FavoriteType, id: number) => {
     setFavorites((prev) => {
+      let next: Favorites
       if (prev[type].includes(id)) {
-        return { ...prev, [type]: prev[type].filter((x) => x !== id) }
+        next = { ...prev, [type]: prev[type].filter((x) => x !== id) }
+      } else {
+        next = { ...prev, [type]: [...prev[type], id] }
       }
-      return { ...prev, [type]: [...prev[type], id] }
+      saveFavorites(next)
+      return next
     })
   }, [])
 
