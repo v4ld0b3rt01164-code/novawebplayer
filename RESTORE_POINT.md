@@ -1,9 +1,9 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-19 (atualizado - sessoes persistidas em disco, restart periodico inteligente)
-**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode) — build/typecheck OK
-**Checkpoint git**: tag `checkpoint-2026-07-18` (anterior: `checkpoint-2026-07-17-transcode-fallback`) — ver secao "Ponto de restauracao (git)" abaixo
-**Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo). Botao flutuante usa `maximized: true` (mesmo padrao FILMES).
+**Data**: 2026-07-29 (atualizado - Favoritos implementado em todas as secoes)
+**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos)
+**Checkpoint git**: ultimo commit: `0d25c7a` (fix: Live favoritos)
+**Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo).
 
 ---
 
@@ -39,6 +39,7 @@ scripts\windows\restart.bat
 
 | Tag | Estado |
 |---|---|
+| `0d25c7a` | Favoritos em Live, Movies e Series — singleton compartilhado + endpoints com category_id opcional |
 | `checkpoint-2026-07-18` | player fixo no topo SeriesScreen desktop (fixed inset-0 z-50) + useIsDesktopViewport evita 2 VideoPlayers |
 | `checkpoint-2026-07-17-transcode-fallback` | + fallback automatico /stream -> /transcode no player (iOS AC3/EAC3 + heuristica "toca mudo") |
 | `checkpoint-2026-07-17` | seguranca: path traversal corrigido + rate limiting + trustProxy |

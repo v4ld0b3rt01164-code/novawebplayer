@@ -25,6 +25,7 @@ isolados no backend.
 | Data     | React Query 5 |
 | XMLTV    | fast-xml-parser 5 (backend, cache 30 min) |
 | Sessao   | Persistida em disco + token UUID (TTL 24h) |
+| Favoritos | localStorage (chave `nova-favorites`), singleton compartilhado |
 | Operacao | PM2 7 (local), Cloudflare Tunnel (publico), scripts Windows `.bat` |
 
 ---
@@ -38,13 +39,13 @@ isolados no backend.
 | GET    | `/api/health` | nao | healthcheck |
 | POST   | `/api/auth` | nao | login com `{ username, password }` (fallback entre 8 dominios; rate limit 5 req/min por IP) |
 | GET    | `/api/live/categories` | sim | categorias de TV ao vivo |
-| GET    | `/api/live/streams?category_id=` | sim | canais da categoria |
+| GET    | `/api/live/streams?category_id=` | sim | canais da categoria (category_id opcional — sem ele, retorna todos) |
 | GET    | `/api/live/short_epg/:stream_id` | sim | EPG curto |
 | GET    | `/api/movies/categories` | sim | categorias de filmes |
-| GET    | `/api/movies/streams?category_id=` | sim | filmes |
+| GET    | `/api/movies/streams?category_id=` | sim | filmes (category_id opcional — sem ele, retorna todos) |
 | GET    | `/api/movies/:vod_id` | sim | info de um filme |
 | GET    | `/api/series/categories` | sim | plataformas |
-| GET    | `/api/series?category_id=` | sim | series |
+| GET    | `/api/series?category_id=` | sim | series (category_id opcional — sem ele, retorna todas) |
 | GET    | `/api/series/:series_id` | sim | info + temporadas + episodios |
 | GET    | `/api/epg` | sim | XMLTV parseado (cache 30 min) |
 | GET    | `/api/epg/channel/:epg_channel_id` | sim | EPG de um canal |
@@ -113,6 +114,9 @@ para buscar segmentos.
 - Dados persistidos no `localStorage` (chave `nova-favorites`).
 - Cada categoria Favoritos mostra contagem de itens.
 - Ao clicar, filtra e mostra apenas itens marcados com coracao.
+- **Singleton**: `useFavorites` usa variavel modulo compartilhada (`cached`) + listeners para sincronizar todos os componentes instantaneamente.
+- **Backend**: endpoints de streams aceitam `category_id` opcional. Sem category_id, busca todos os streams via Xtream API direto (sem duplicar requests por categoria).
+- **Arquivos**: `useFavorites.ts` (hook), `FavoriteButton.tsx` (botao), `FavoritesScreen.tsx` (tela预留, nao usada no menu), `index.ts` (exports).
 
 ### TV AO VIVO
 - Categorias -> Canais -> Player.
@@ -251,8 +255,10 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - Menu responsivo (sem moldura, 3 colunas mobile): OK
 - Busca em filmes e series: OK
 - **Favoritos: categoria dentro de Live, Movies e Series — OK**
-- **Botao de coracao em todos os cards — OK**
+- **Botao de coracao em todos os cards (Live, Movies, Series) — OK**
 - **Persistencia de favoritos no localStorage — OK**
+- **Sincronizacao entre componentes via singleton — OK**
+- **Backend: endpoints com category_id opcional para favoritos — OK**
 - Scripts Windows (start/stop/restart/status): OK
 - Auto-inicializacao via Task Scheduler: OK
 - **Path traversal (`--path-as-is` e `%2e%2e`): 403 bloqueado (validado em producao)**

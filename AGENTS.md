@@ -102,6 +102,15 @@ atualizar este arquivo.
    nos domínios restantes e repete a chamada. Nunca desabilitar ou ignorar
    esse mecanismo. Usar `UpstreamHttpError` (não `Error` genérico) para
    erros HTTP do upstream que permitem fallback.
+10. **Favoritos usam singleton compartilhado.** O hook `useFavorites` mantém
+    uma variável de módulo (`cached`) sincronizada via listeners. Ao alterar,
+    todos os componentes que usam o hook atualizam instantaneamente. Dados
+    persistidos no `localStorage` (chave `nova-favorites`). Nunca criar
+    múltiplas instâncias isoladas — usar sempre o hook.
+11. **Endpoints de streams aceitam category_id opcional.** Quando omitido,
+    retornam todos os itens (Live, Movies, Series). Usado pela tela de
+    Favoritos para buscar todas as streams e filtrar pelas salvas no
+    localStorage.
 
 ## Fluxo de trabalho esperado do agente
 
