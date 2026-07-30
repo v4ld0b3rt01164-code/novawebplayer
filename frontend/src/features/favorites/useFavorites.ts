@@ -9,9 +9,8 @@ interface Favorites {
 }
 
 const STORAGE_KEY = 'nova-favorites'
-const EVENT_NAME = 'nova-favorites-change'
 
-function loadFavorites(): Favorites {
+function loadFromStorage(): Favorites {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
@@ -22,71 +21,54 @@ function loadFavorites(): Favorites {
         series: Array.isArray(parsed.series) ? parsed.series : [],
       }
     }
-  } catch {
-    // corrupted data — reset
-  }
+  } catch { /* corrupted */ }
   return { live: [], movies: [], series: [] }
 }
 
-function saveFavorites(favs: Favorites) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(favs))
-  window.dispatchEvent(new Event(EVENT_NAME))
+let cached: Favorites = loadFromStorage()
+let listeners: Array<() => void> = []
+
+function update(next: Favorites) {
+  cached = next
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  for (const l of listeners) l()
 }
 
 export function useFavorites() {
-  const [favorites, setFavorites] = useState<Favorites>(loadFavorites)
+  const [favorites, setFavorites] = useState(cached)
 
   useEffect(() => {
-    const handler = () => setFavorites(loadFavorites())
-    window.addEventListener(EVENT_NAME, handler)
-    return () => window.removeEventListener(EVENT_NAME, handler)
+    const handler = () => setFavorites(cached)
+    listeners.push(handler)
+    return () => { listeners = listeners.filter(l => l !== handler) }
   }, [])
 
   const addFavorite = useCallback((type: FavoriteType, id: number) => {
-    setFavorites((prev) => {
-      if (prev[type].includes(id)) return prev
-      const next = { ...prev, [type]: [...prev[type], id] }
-      saveFavorites(next)
-      return next
-    })
+    if (cached[type].includes(id)) return
+    update({ ...cached, [type]: [...cached[type], id] })
   }, [])
 
   const removeFavorite = useCallback((type: FavoriteType, id: number) => {
-    setFavorites((prev) => {
-      const next = { ...prev, [type]: prev[type].filter((x) => x !== id) }
-      saveFavorites(next)
-      return next
-    })
+    update({ ...cached, [type]: cached[type].filter(x => x !== id) })
   }, [])
 
   const toggleFavorite = useCallback((type: FavoriteType, id: number) => {
-    setFavorites((prev) => {
-      let next: Favorites
-      if (prev[type].includes(id)) {
-        next = { ...prev, [type]: prev[type].filter((x) => x !== id) }
-      } else {
-        next = { ...prev, [type]: [...prev[type], id] }
-      }
-      saveFavorites(next)
-      return next
-    })
+    if (cached[type].includes(id)) {
+      update({ ...cached, [type]: cached[type].filter(x => x !== id) })
+    } else {
+      update({ ...cached, [type]: [...cached[type], id] })
+    }
   }, [])
 
   const isFavorite = useCallback(
-    (type: FavoriteType, id: number) => favorites[type].includes(id),
+    (type: FavoriteType, id: number) => cached[type].includes(id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [favorites],
   )
 
   const count = favorites.live.length + favorites.movies.length + favorites.series.length
 
-  return {
-    favorites,
-    addFavorite,
-    removeFavorite,
-    toggleFavorite,
-    isFavorite,
-    count,
-  }
+  return { favorites, addFavorite, removeFavorite, toggleFavorite, isFavorite, count }
 }
 
 export type { FavoriteType }

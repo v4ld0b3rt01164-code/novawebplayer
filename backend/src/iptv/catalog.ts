@@ -62,11 +62,11 @@ export async function getLiveCategories(
 
 export async function getLiveStreams(
   session: Session,
-  categoryId: string,
+  categoryId?: string,
 ): Promise<XtreamLiveStream[]> {
-  return xtreamFetch<XtreamLiveStream[]>(session, 'get_live_streams', {
-    category_id: categoryId,
-  })
+  const extra: Record<string, string | number | undefined> = {}
+  if (categoryId) extra.category_id = categoryId
+  return xtreamFetch<XtreamLiveStream[]>(session, 'get_live_streams', extra)
 }
 
 export async function getShortEpg(

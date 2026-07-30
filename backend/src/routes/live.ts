@@ -25,15 +25,8 @@ const liveRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       const streams = await catalog.getLiveStreams(req.session!, category_id)
       return { streams }
     }
-    const categories = await catalog.getLiveCategories(req.session!)
-    const allStreams: Awaited<ReturnType<typeof catalog.getLiveStreams>> = []
-    const results = await Promise.allSettled(
-      categories.map((c) => catalog.getLiveStreams(req.session!, c.category_id)),
-    )
-    for (const r of results) {
-      if (r.status === 'fulfilled') allStreams.push(...r.value)
-    }
-    return { streams: allStreams }
+    const streams = await catalog.getLiveStreams(req.session!)
+    return { streams }
   })
 
   app.get('/short_epg/:stream_id', async (req) => {
