@@ -22,3 +22,10 @@ desktop.ini
 
 # macOS (caso o projeto seja aberto em outro SO)
 .DS_Store
+
+# Screenshots de debug (prints de erro compartilhados em sessao para
+# diagnostico — NAO sao documentacao do projeto)
+erro-formato.jpg
+*-print.jpg
+*-screenshot.jpg
+*.png.bak

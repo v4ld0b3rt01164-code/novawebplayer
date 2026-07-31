@@ -43,6 +43,9 @@ const streamRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
     if (ext === 'm3u8') {
       const origin = `${req.headers['x-forwarded-proto'] ?? req.protocol}://${req.headers.host}`
+      console.log(
+        `[stream] ${type}/${file} via ${new URL(session.server.baseUrl).host} (sessão ${session.token.slice(0, 8)}…)`,
+      )
       try {
         const playlist = await withUpstreamFallback(session, () =>
           fetchRewrittenPlaylist(

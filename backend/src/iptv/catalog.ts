@@ -13,6 +13,24 @@ import {
 
 const REQUEST_TIMEOUT_MS = 10_000
 
+/**
+ * Reescreve uma URL de imagem upstream (geralmente http://) para passar pelo
+ * proxy do backend em /api/img?u=... (URL relativa, resolve para a mesma
+ * origem https do frontend). Resolve Mixed Content em iOS/navegadores modernos.
+ * Strings vazias ou não-URLs são devolvidas inalteradas.
+ */
+function proxyImage(url: string | undefined): string {
+  if (!url) return url ?? ''
+  if (!/^https?:\/\//i.test(url)) return url
+  return `/api/img?u=${encodeURIComponent(url)}`
+}
+
+/** Versão para arrays de backdrop_path. */
+function proxyImages(urls: string[] | undefined): string[] {
+  if (!urls) return []
+  return urls.map(proxyImage)
+}
+
 function buildXtreamUrl(
   session: Session,
   action: string,
@@ -66,7 +84,9 @@ export async function getLiveStreams(
 ): Promise<XtreamLiveStream[]> {
   const extra: Record<string, string | number | undefined> = {}
   if (categoryId) extra.category_id = categoryId
-  return xtreamFetch<XtreamLiveStream[]>(session, 'get_live_streams', extra)
+  const streams = await xtreamFetch<XtreamLiveStream[]>(session, 'get_live_streams', extra)
+  for (const s of streams) s.stream_icon = proxyImage(s.stream_icon)
+  return streams
 }
 
 export async function getShortEpg(
@@ -92,16 +112,20 @@ export async function getVodStreams(
 ): Promise<XtreamVodStream[]> {
   const extra: Record<string, string | number | undefined> = {}
   if (categoryId) extra.category_id = categoryId
-  return xtreamFetch<XtreamVodStream[]>(session, 'get_vod_streams', extra)
+  const streams = await xtreamFetch<XtreamVodStream[]>(session, 'get_vod_streams', extra)
+  for (const s of streams) s.stream_icon = proxyImage(s.stream_icon)
+  return streams
 }
 
 export async function getVodInfo(
   session: Session,
   vodId: number,
 ): Promise<XtreamVodInfoResponse> {
-  return xtreamFetch<XtreamVodInfoResponse>(session, 'get_vod_info', {
+  const data = await xtreamFetch<XtreamVodInfoResponse>(session, 'get_vod_info', {
     vod_id: vodId,
   })
+  if (data.info) data.info.cover = proxyImage(data.info.cover)
+  return data
 }
 
 export async function getSeriesCategories(
@@ -116,7 +140,12 @@ export async function getSeries(
 ): Promise<XtreamSeries[]> {
   const extra: Record<string, string | number | undefined> = {}
   if (categoryId) extra.category_id = categoryId
-  return xtreamFetch<XtreamSeries[]>(session, 'get_series', extra)
+  const series = await xtreamFetch<XtreamSeries[]>(session, 'get_series', extra)
+  for (const s of series) {
+    s.cover = proxyImage(s.cover)
+    s.backdrop_path = proxyImages(s.backdrop_path)
+  }
+  return series
 }
 
 export async function getSeriesInfo(
@@ -135,6 +164,18 @@ export async function getSeriesInfo(
     data.episodes && !Array.isArray(data.episodes)
       ? (data.episodes as Record<string, XtreamEpisode[]>)
       : {}
+
+  if (data.info) {
+    data.info.cover = proxyImage(data.info.cover)
+    data.info.backdrop_path = proxyImages(data.info.backdrop_path)
+  }
+  if (data.episodes) {
+    for (const season of Object.values(data.episodes as Record<string, XtreamEpisode[]>)) {
+      for (const ep of season) {
+        if (ep.info) ep.info.movie_image = proxyImage(ep.info.movie_image)
+      }
+    }
+  }
 
   return {
     ...data,
