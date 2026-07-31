@@ -11,7 +11,7 @@ echo.
 echo Instalando tarefas de auto-inicializacao...
 echo.
 
-echo [1/2] Criando tarefa: NOVA Start (logon)...
+echo [1/3] Criando tarefa: NOVA Start (logon)...
 schtasks /Delete /TN "NOVA Web Player - Start" /F 2>nul
 schtasks /Create /TN "NOVA Web Player - Start" ^
     /TR "\"%~dp0start-hidden.bat\"" ^
@@ -25,7 +25,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/2] Criando tarefa: NOVA Watchdog (monitoramento)...
+echo [2/3] Criando tarefa: NOVA Watchdog (monitoramento)...
 schtasks /Delete /TN "NOVA Web Player - Watchdog" /F 2>nul
 schtasks /Create /TN "NOVA Web Player - Watchdog" ^
     /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"%~dp0watchdog.ps1\"" ^
@@ -63,7 +63,7 @@ echo Instalacao concluida!
 echo.
 echo - NOVA Start: inicia backend+tunnel no logon
 echo - NOVA Watchdog: verifica saude a cada 2 min
-echo - NOVA Periodic Restart: reinicia tudo a cada 8h
+echo - NOVA Periodic Restart: reinicia tunnel a cada 8h
 echo.
 echo Para desinstalar: uninstall-startup.bat
 echo ========================================
