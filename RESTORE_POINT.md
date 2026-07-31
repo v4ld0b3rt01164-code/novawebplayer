@@ -114,6 +114,7 @@ commitado corresponder ao codigo-fonte.
 - [x] **index.html sempre no-store** (hook onSend forca em text/html; assets com hash mantem cache 30d)
 - [x] **Fallback automatico para transcode** (Live -> HLS; Filmes/Séries -> MP4 H.264/AAC progressivo; erro de codec, `NotSupportedError` ou "toca mudo" no iOS/WebKit)
 - [x] **Fallback mobile VOD** (rejeicao `NotSupportedError` de `video.play()` capturada; listener registrado antes da primeira carga; MIME `.mp4` normalizado no proxy)
+- [x] **Diagnostico e robustez do transcode** (FFmpeg recebe `User-Agent`/`Accept`; stderr sanitizado; cleanup ESM sem `require()`)
 - [x] **Sessao persistida em disco** (sessions.json com debounced write, sobrevive a restarts do backend)
 
 ---

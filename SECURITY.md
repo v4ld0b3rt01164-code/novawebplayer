@@ -285,7 +285,20 @@ aprovado com aviso preexistente de import nao utilizado em
 
 ---
 
-### 10. Monitor local de sessoes — IMPLEMENTADO
+### 10. Logs do transcode sem tokens ou credenciais — IMPLEMENTADO
+
+**Arquivos**: `backend/src/iptv/transcode.ts`
+
+O stderr do FFmpeg pode conter a URL de entrada do painel. O backend agora
+mantem somente um trecho limitado do erro e mascara usuario/senha antes de
+registrar a mensagem. As mensagens de estado usam apenas os primeiros oito
+caracteres do token de sessao. O cleanup usa imports ESM, sem `require()`.
+
+**Status**: Implementado e validado por typecheck/build.
+
+---
+
+### 11. Monitor local de sessoes — IMPLEMENTADO
 
 **Tipo**: observabilidade local
 **Arquivo**: `monitor-server.bat`

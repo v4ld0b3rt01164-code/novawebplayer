@@ -195,6 +195,12 @@ para buscar segmentos.
   `backend/src/routes/transcode.ts`.
 - Artefatos compilados correspondentes ficam em `frontend/dist` e
   `backend/dist`.
+- Diagnostico do primeiro teste real: o endpoint de transcode respondeu `504`
+  porque o FFmpeg encerrou antes de produzir o MP4; o erro detalhado estava
+  sendo descartado. A rotina agora envia `User-Agent`/`Accept` compatíveis,
+  registra somente a mensagem sanitizada e nao expoe token ou credencial.
+- Corrigido tambem o cleanup ESM do transcode: removido uso de `require()` que
+  derrubava o backend quando um transcode ocioso era limpo.
 - Validacao em dispositivo real: pendente após reinício do backend, cobrindo
   iPhone Safari, iPhone Chrome, Android e um conteúdo VOD que falhava.
 

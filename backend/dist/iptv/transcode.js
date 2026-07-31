@@ -12,7 +12,7 @@
  * recebe HLS apenas para LIVE e MP4 progressivo para VOD.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, statSync, createReadStream } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, rmSync, statSync, unlinkSync, } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -27,6 +27,12 @@ function buildUpstreamUrl(session, type, file) {
 }
 function key(session, type, file) {
     return `${session.token}::${type}::${file}`;
+}
+function logKey(session, type, file) {
+    return `${session.token.slice(0, 8)}...::${type}::${file}`;
+}
+function maskTranscodeError(message) {
+    return message.replace(/(https?:\/\/[^/\s]+\/(?:live|movie|series)\/)[^/\s]+\/[^/\s]+/gi, '$1****/****');
 }
 function safeDir(session, type, file) {
     const safeFile = file.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -66,7 +72,7 @@ export async function startTranscode(session, type, file) {
     const old = await readdir(dir).catch(() => []);
     for (const f of old) {
         try {
-            require('node:fs').unlinkSync(path.join(dir, f));
+            unlinkSync(path.join(dir, f));
         }
         catch {
             // ignore
@@ -82,6 +88,8 @@ export async function startTranscode(session, type, file) {
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '5',
+        '-user_agent', 'NovaWebPlayer/1.0',
+        '-headers', 'Accept: */*\r\n',
         '-i', upstreamUrl,
     ];
     if (type === 'live') {
@@ -120,8 +128,9 @@ export async function startTranscode(session, type, file) {
         completion,
     };
     states.set(k, state);
-    proc.stderr?.on('data', () => {
-        // silencioso: ffmpeg já imprime com -loglevel error
+    let stderrTail = '';
+    proc.stderr?.on('data', (chunk) => {
+        stderrTail = `${stderrTail}${chunk.toString('utf8')}`.slice(-4000);
     });
     proc.on('error', (err) => {
         state.failed = true;
@@ -129,14 +138,15 @@ export async function startTranscode(session, type, file) {
         console.error('[transcode] erro ao iniciar ffmpeg:', err.message);
     });
     proc.on('exit', (code) => {
-        console.log(`[transcode] ffmpeg saiu (code=${code}) key=${k}`);
+        const detail = maskTranscodeError(stderrTail.trim());
+        console.log(`[transcode] ffmpeg saiu (code=${code}) key=${logKey(session, type, file)}${detail ? ` erro=${detail}` : ''}`);
         if (code === 0) {
             state.completed = true;
             finish(true);
             return;
         }
         if (type === 'live' && Date.now() - state.lastAccess < 120_000) {
-            console.log(`[transcode] reiniciando ffmpeg para ${k}`);
+            console.log(`[transcode] reiniciando ffmpeg para ${logKey(session, type, file)}`);
             states.delete(k);
             finish(false);
             startTranscode(state.session, type, file).catch((err) => {
@@ -160,7 +170,7 @@ function scheduleIdleCleanup() {
         const now = Date.now();
         for (const [k, s] of states) {
             if (now - s.lastAccess > IDLE_TIMEOUT_MS) {
-                console.log(`[transcode] encerrando ocioso: ${k}`);
+                console.log(`[transcode] encerrando ocioso: ${logKey(s.session, s.type, s.file)}`);
                 try {
                     s.proc.kill('SIGKILL');
                 }
@@ -168,7 +178,7 @@ function scheduleIdleCleanup() {
                     // ignore
                 }
                 states.delete(k);
-                require('node:fs').rmSync(s.dir, { recursive: true, force: true });
+                rmSync(s.dir, { recursive: true, force: true });
             }
         }
     }, 30_000);
