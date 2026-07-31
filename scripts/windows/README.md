@@ -10,14 +10,11 @@ Pasta: `scripts/windows/`
   cd backend
   npm run build
   ```
-- **pm2** instalado globalmente:
-  ```powershell
-  npm install -g pm2
-  ```
 - **cloudflared** instalado e autenticado:
   ```powershell
   cloudflared tunnel list
   ```
+- `curl` disponivel no PATH para o health check.
 
 ## Configuração
 
@@ -64,7 +61,7 @@ Para criar um atalho na área de trabalho que execute um dos scripts:
 1. Clique com botão direito na área de trabalho → **Novo** → **Atalho**.
 2. Aponte para o `.bat` desejado (ex.: `scripts\windows\restart.bat`).
 3. Dê um nome (ex.: "NOVA Restart").
-4. **Importante:** Não marque "Executar como administrador" — isso mudaria a sessão Windows e causaria o erro `EPERM \\.\pipe\rpc.sock` no PM2.
+4. **Importante:** Não marque "Executar como administrador" — isso mudaria a sessão Windows usada pelos processos.
 
 Se o atalho já existir e der o erro `EPERM`, verifique as propriedades do atalho e desmarque "Executar como administrador" se estiver habilitado.
 
@@ -72,4 +69,5 @@ Se o atalho já existir e der o erro `EPERM`, verifique as propriedades do atalh
 
 - O frontend é servido pelo próprio backend a partir de `backend/../frontend/dist` (mesma origem HTTPS: `novawebplayer.app`). Por isso, em produção, **não é necessário iniciar o Vite separadamente**.
 - `stop.bat` encerra todos os processos `cloudflared.exe`. Se você executa outros túneis no mesmo usuário, pare-os manualmente com `cloudflared tunnel stop <nome>`.
-- Para ver logs do backend: `pm2 logs nova-web-player`.
+- `restart.bat` inicia o backend e o tunnel sem janelas visiveis. Os logs ficam em `backend\backend.log`, `backend\backend-error.log`, `backend\cloudflared.log` e `backend\cloudflared-error.log`.
+- Para ver os logs: `Get-Content backend\backend.log -Wait` ou abra os arquivos `.log` gerados no backend.

@@ -1,7 +1,7 @@
 # STATUS — NOVA Web Player
 
 Documento vivo do estado atual do projeto. Atualizado em: 2026-07-31
-(Login: ordem aleatoria segura entre os 8 dominios a cada autenticacao;
+(Login aleatorio entre 8 dominios; monitor local de sessoes; restart sem janelas visiveis;
 Favoritos: categoria dentro de Live, Movies e Series com persistencia localStorage).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
@@ -219,10 +219,11 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 ### Scripts Windows
 - `start.bat` - Inicia backend + tunnel
 - `stop.bat` - Para tudo
-- `restart.bat` - Para e reinicia
+- `restart.bat` - Para e reinicia backend + tunnel sem janelas visiveis; grava logs em `backend\*.log`
 - `status.bat` - Verifica saude (PM2, porta, build, health)
 - `install-startup.bat` - Instala auto-inicializacao via Task Scheduler
 - `uninstall-startup.bat` - Remove auto-inicializacao
+- `monitor-server.bat` - Mostra localmente o `baseUrl` das sessoes nao expiradas a cada 2 segundos
 
 ### Cloudflare Tunnel
 - Binario: `C:\Program Files (x86)\cloudflared\cloudflared.exe`
@@ -272,6 +273,8 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **Sessao persistida em disco (sessions.json): OK**
 - **VOD iPhone (filmes + series): OK — iOS WebKit redirect para /transcode validado por usuario iPhone**
 - **Login com ordem aleatoria entre 8 dominios: typecheck/build OK; lint OK com aviso preexistente**
+- **Monitor local de sessoes (`monitor-server.bat`): OK; nao exibe credenciais ou tokens**
+- **`restart.bat` com backend e tunnel ocultos: validado por sintaxe e logs redirecionados**
 
 ---
 

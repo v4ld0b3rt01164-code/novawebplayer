@@ -1,7 +1,7 @@
 # Scripts de Operacao — Windows
 
-Estrutura de scripts `.bat` para gerenciar servicos de um projeto Node.js
-servido via PM2 + Cloudflare Tunnel no Windows.
+Estrutura de scripts `.bat` e `.ps1` para gerenciar um projeto Node.js
+servido via Cloudflare Tunnel no Windows.
 
 ## Estrutura
 
@@ -16,15 +16,16 @@ scripts/windows/
   install-startup.bat      # Instala auto-inicializacao
   uninstall-startup.bat    # Remove auto-inicializacao
   watchdog.ps1             # Monitor PowerShell (opcional)
+monitor-server.bat         # Monitor local das sessoes ativas
 ```
 
 ## Variaveis (config.bat)
 
 ```batch
 set "BACKEND_DIR=%~dp0..\..\backend"
-set "ECOSYSTEM=%BACKEND_DIR%\ecosystem.windows.config.cjs"
-set "BACKEND_PM2_NAME=nova-backend"
-set "TUNNEL_PM2_NAME=nova-tunnel"
+set "FRONTEND_DIR=%~dp0..\..\frontend"
+set "PID_DIR=%~dp0..\.pids"
+set "TUNNEL_NAME=novawebplayer"
 ```
 
 `%~dp0` resolve para o diretorio do proprio script. Ajuste os nomes
@@ -33,26 +34,37 @@ conforme seu projeto.
 ## Scripts
 
 ### start.bat
-Verifica se cada processo PM2 esta rodando. Se nao, inicia via
-`ecosystem.windows.config.cjs`. Se ja esta parado, reinicia.
+Verifica a porta 3001 e o processo `cloudflared`. Se necessario, inicia
+`node dist/index.js` e `cloudflared tunnel run <nome>`.
 
 ### stop.bat
-Para e deleta todos os processos PM2 (`pm2 stop` + `pm2 delete`).
+Encerra o processo que escuta a porta 3001 e todos os processos
+`cloudflared.exe`.
 
 ### restart.bat
-Para tudo, aguarda 3 segundos, inicia via ecosystem.
+Para backend e tunnel, aguarda 2 segundos e inicia ambos sem janelas visiveis.
+Os processos sao iniciados com `WindowStyle Hidden`; stdout e stderr ficam em
+`backend\backend.log`, `backend\backend-error.log`, `backend\cloudflared.log` e
+`backend\cloudflared-error.log`.
+
+### monitor-server.bat
+Executa na raiz do projeto. Le `backend\sessions.json` em modo somente leitura,
+atualiza a tela a cada 2 segundos e mostra o `server.baseUrl` das sessoes nao
+expiradas, junto com os horarios de conexao e expiracao. Nunca exibe usuario,
+senha ou token e nao cria nenhuma rota de rede.
 
 ### status.bat
 Checklist de saude:
-- Tabela PM2
-- Porta do backend (netstat)
+- Porta 3001
+- Processo cloudflared
 - Existencia do build do frontend
 - Health check HTTP (curl)
 
 ### install-startup.bat
-Cria duas tarefas no Task Scheduler do Windows:
+Cria tres tarefas no Task Scheduler do Windows:
 - **NOVA Start**: roda `start-hidden.bat` no logon do usuario
 - **NOVA Watchdog**: roda `watchdog.ps1` a cada 2 minutos
+- **NOVA Periodic Restart**: reinicia o tunnel a cada 8 horas
 
 ### uninstall-startup.bat
 Remove as tarefas do Task Scheduler.
@@ -60,12 +72,11 @@ Remove as tarefas do Task Scheduler.
 ## Requisitos
 
 - **Node.js** instalado e no PATH
-- **PM2** acessivel via `npx pm2` (instalado localmente em node_modules)
-  ou globalmente (`npm i -g pm2`)
+- **PowerShell** e **Task Scheduler** disponiveis no Windows
 - **cloudflared** no PATH (para o tunnel)
 - **curl** no PATH (para health check no status.bat, opcional)
 
-## Instalacao PM2
+## PM2 opcional
 
 ```bash
 # Local (recomendado para projetos)
@@ -76,7 +87,9 @@ npm i pm2
 npm i -g pm2
 ```
 
-Se PM2 esta local, os scripts usam `call npx pm2` para encontrar.
+O arquivo `backend/ecosystem.windows.config.cjs` continua disponivel para quem
+quiser operar o projeto via PM2, mas os scripts Windows atuais iniciam os
+processos diretamente e nao dependem do PM2.
 
 ## Ecosystem (ecosystem.windows.config.cjs)
 

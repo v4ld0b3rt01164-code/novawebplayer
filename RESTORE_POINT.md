@@ -1,8 +1,8 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-31 (login com ordem aleatoria entre 8 dominios)
-**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos + login aleatorio)
-**Checkpoint git**: `checkpoint-2026-07-31`
+**Data**: 2026-07-31 (monitor local + restart sem janelas visiveis)
+**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos + login aleatorio + monitor local)
+**Checkpoint git**: `checkpoint-2026-07-31-monitor`
 **Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo).
 
 ---
@@ -21,13 +21,13 @@ cd C:\Users\Valdo\Desktop\TUDO\SITES\DEV\NOVAWEBPLAYER
 
 # 1. Ver o que mudou desde o checkpoint (opcional)
 git status
-git diff checkpoint-2026-07-31
+git diff checkpoint-2026-07-31-monitor
 
 # 2. Guardar mudancas atuais em andamento (opcional, recuperavel depois)
 git stash push -u -m "antes de restaurar"
 
 # 3. Voltar TODO o codigo ao estado do checkpoint (descarta mudancas!)
-git reset --hard checkpoint-2026-07-31
+git reset --hard checkpoint-2026-07-31-monitor
 
 # 4. Restaurar dependencias exatas e reiniciar
 cd backend; npm install; cd ..
@@ -39,6 +39,7 @@ scripts\windows\restart.bat
 
 | Tag | Estado |
 |---|---|
+| `checkpoint-2026-07-31-monitor` | Login aleatorio entre 8 dominios + monitor local de sessoes + restart sem janelas visiveis |
 | `checkpoint-2026-07-31` | Login com ordem aleatoria segura entre os 8 dominios + fallback preservado; builds do backend atualizados |
 | `0d25c7a` | Favoritos em Live, Movies e Series — singleton compartilhado + endpoints com category_id opcional |
 | `checkpoint-2026-07-18` | player fixo no topo SeriesScreen desktop (fixed inset-0 z-50) + useIsDesktopViewport evita 2 VideoPlayers |
@@ -88,6 +89,7 @@ commitado corresponder ao codigo-fonte.
 ## O que funciona
 
 - [x] Login com ordem aleatoria e fallback entre 8 dominios IPTV (`crypto.randomInt` + Fisher-Yates)
+- [x] Monitor local de sessoes em `monitor-server.bat` (somente `server.baseUrl`, sem credenciais)
 - [x] **Fallback em tempo real durante streaming** (re-autenticacao automatica em 401/403)
 - [x] TV ao vivo (HLS via proxy com descoberta de servidor real)
 - [x] **Auto-play primeiro canal ao entrar na pasta** (miniplayer ja inicia reproduzindo)
@@ -172,6 +174,7 @@ NOVAWEBPLAYER/
 │   ├── uninstall-startup.bat           # Remove Task Scheduler
 │   ├── watchdog.ps1                    # Monitor PowerShell
 │   └── periodic-restart.ps1            # Restart inteligente (tunnel a cada 8h)
+├── monitor-server.bat                    # Monitor local de servidores das sessoes ativas
 ├── AGENTS.md                           # Regras para agentes de cod
 ├── PRD.md                              # Requisitos do projeto
 ├── SCRIPTS.md                          # Docs dos scripts Windows
@@ -323,6 +326,9 @@ cd backend && npm run build
 # Validacoes backend
 cd backend && npm run typecheck
 cd backend && npm run lint
+
+# Monitor local de sessoes
+monitor-server.bat
 
 # Build completo (frontend + backend)
 cd frontend && npm run build && cd ../backend && npm run build && pm2 restart nova-backend

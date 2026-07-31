@@ -2,6 +2,6 @@
 chcp 65001 >nul
 call "%~dp0config.bat"
 
-cd /d "%BACKEND_DIR%"
-npx pm2 start "%ECOSYSTEM%" 2>nul
-npx pm2 save 2>nul
+start "nova-backend" /b cmd /c "cd /d "%BACKEND_DIR%" && node dist/index.js"
+timeout /t 3 /nobreak >nul
+start "nova-tunnel" /b cmd /c "cloudflared tunnel run %TUNNEL_NAME%"

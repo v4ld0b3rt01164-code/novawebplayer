@@ -285,6 +285,23 @@ aprovado com aviso preexistente de import nao utilizado em
 
 ---
 
+### 10. Monitor local de sessoes — IMPLEMENTADO
+
+**Tipo**: observabilidade local
+**Arquivo**: `monitor-server.bat`
+**Data da implementacao**: 2026-07-31
+
+O monitor le somente `backend/sessions.json` e considera ativas as sessoes
+cujo `expiresAt` ainda nao expirou. Exibe apenas o `server.baseUrl`, o inicio
+e a expiracao da sessao. Usuario, senha e token nunca sao impressos.
+
+O monitor nao cria rota HTTP, nao faz requisicoes externas e deve ser
+executado somente por quem possui acesso local a pasta do projeto.
+
+**Status**: Implementado e validado.
+
+---
+
 ## Resumo para decisao
 
 | Achado | Severidade | Status | Correcao |
