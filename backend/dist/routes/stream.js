@@ -32,6 +32,7 @@ const streamRoutes = async (app) => {
         const ext = file.split('.').pop()?.toLowerCase() ?? '';
         if (ext === 'm3u8') {
             const origin = `${req.headers['x-forwarded-proto'] ?? req.protocol}://${req.headers.host}`;
+            console.log(`[stream] ${type}/${file} via ${new URL(session.server.baseUrl).host} (sessão ${session.token.slice(0, 8)}…)`);
             try {
                 const playlist = await withUpstreamFallback(session, () => fetchRewrittenPlaylist(session, type, file, origin, session.token));
                 reply.header('content-type', 'application/vnd.apple.mpegurl');

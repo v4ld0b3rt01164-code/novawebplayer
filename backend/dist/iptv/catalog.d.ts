@@ -1,7 +1,7 @@
 import type { Session } from '../session/store.js';
 import { type XtreamCategory, type XtreamLiveStream, type XtreamSeries, type XtreamSeriesInfoResponse, type XtreamShortEpgResponse, type XtreamVodInfoResponse, type XtreamVodStream } from './types.js';
 export declare function getLiveCategories(session: Session): Promise<XtreamCategory[]>;
-export declare function getLiveStreams(session: Session, categoryId: string): Promise<XtreamLiveStream[]>;
+export declare function getLiveStreams(session: Session, categoryId?: string): Promise<XtreamLiveStream[]>;
 export declare function getShortEpg(session: Session, streamId: number, limit?: number): Promise<XtreamShortEpgResponse>;
 export declare function getVodCategories(session: Session): Promise<XtreamCategory[]>;
 export declare function getVodStreams(session: Session, categoryId?: string): Promise<XtreamVodStream[]>;

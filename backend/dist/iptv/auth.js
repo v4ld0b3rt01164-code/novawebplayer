@@ -39,7 +39,23 @@ async function tryAuthenticate(baseUrl, username, password) {
     return null;
 }
 /**
- * Percorre a lista de domínios candidatos até um autenticar com sucesso.
+ * Embaralha um array em-place (Fisher-Yates) e devolve a mesma referência.
+ * Garante ordem aleatória sem viés para a tentativa de login/fallback.
+ */
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+    return arr;
+}
+/**
+ * Percorre a lista de domínios candidatos (em ordem aleatória por chamada)
+ * até um autenticar com sucesso. A randomização faz com que cada login tente
+ * um servidor diferente primeiro, distribuindo carga e evitando travar sempre
+ * no mesmo domínio quando há instabilidade.
  *
  * @param excludeBaseUrls domínios a pular (ex: sabidamente bloqueados nesta
  * sessão). Usado pelo fallback em nível de stream; login normal não passa nada.
@@ -47,7 +63,7 @@ async function tryAuthenticate(baseUrl, username, password) {
  * exclusão elimina todos os candidatos.
  */
 export async function authenticate(username, password, excludeBaseUrls = new Set()) {
-    const candidates = IPTV_CANDIDATES.filter((baseUrl) => !excludeBaseUrls.has(baseUrl));
+    const candidates = shuffle(IPTV_CANDIDATES.filter((baseUrl) => !excludeBaseUrls.has(baseUrl)));
     if (candidates.length === 0) {
         throw new Error('Todos os servidores candidatos estão bloqueados nesta sessão.');
     }

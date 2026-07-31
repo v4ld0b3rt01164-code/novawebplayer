@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { authRoutes } from './routes/auth.js';
 import { epgRoutes } from './routes/epg.js';
 import { healthRoutes } from './routes/health.js';
+import { imgRoutes } from './routes/img.js';
 import { liveRoutes } from './routes/live.js';
 import { movieRoutes } from './routes/movies.js';
 import { seriesRoutes } from './routes/series.js';
@@ -17,9 +18,12 @@ const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? '127.0.0.1';
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 const app = Fastify({
-    logger: {
-        level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-    },
+    // Logs de request/response do pino são muito ruídos (JSON por linha).
+    // Mantemos só erros do framework; os logs legíveis de negócio
+    // ([auth]/[stream]/[proxy]/[fallback]/[reauth]) são console.log limpos.
+    // Esses logs vão SOMENTE para o console do backend (e backend.log),
+    // jamais para o usuário final — respeita a regra de não vazar dados.
+    logger: { level: 'error' },
     // Necessário para o rate limit (e qualquer outra lógica baseada em IP)
     // enxergar o IP real do cliente a partir do header X-Forwarded-For, já
     // que o backend roda atrás do Cloudflare Tunnel.
@@ -101,6 +105,7 @@ await app.register(liveRoutes, { prefix: '/api/live' });
 await app.register(movieRoutes, { prefix: '/api/movies' });
 await app.register(seriesRoutes, { prefix: '/api/series' });
 await app.register(epgRoutes, { prefix: '/api/epg' });
+await app.register(imgRoutes, { prefix: '/api' });
 await app.register(transcodeRoutes, { prefix: '/transcode' });
 await app.register(streamRoutes, { prefix: '/stream' });
 // DEBUG: rota direta para testar se Fastify responde /stream
