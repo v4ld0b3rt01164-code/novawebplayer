@@ -1,9 +1,8 @@
 # SECURITY.md — NOVA Web Player
 
 Documento de seguranca do projeto. Criado em: 2026-07-17.
-Ultima atualizacao: 2026-07-19 (achados 1-4 implementados + achados 7-8:
-path traversal corrigido e rate limiting implementado + achado 6:
-sessoes persistidas em disco).
+Ultima atualizacao: 2026-07-30 (randomizacao de servidores + proxy de
+imagens do catalogo + logs legiveis isolation).
 Baseado em auditoria completa do codigo-fonte (frontend + backend).
 
 ---
@@ -289,3 +288,13 @@ Pendencia adicional conhecida: limite de processos ffmpeg concorrentes em
 5. Mensagens de erro nao expoe senha, dominio ou detalhes do servidor.
 6. Dominios IPTV ficam em um unico arquivo (`servers.ts`), nao espalhados.
 7. Stream URLs reescritas pelo backend (credenciais IPTV nunca chegam ao frontend).
+8. **Ordem dos servidores e randomizada** (Fisher-Yates em `auth.ts`); o
+   fallback de stream re-embaralha os restantes. Nao ha "primario" fixo.
+9. **Logs do backend sao legiveis e isolados**: pino em nivel `error`
+   (sem JSON de request/response); logs de negocio via `console.log`
+   (`[auth]`, `[stream]`, `[proxy]`, `[fallback]`, `[reauth]`) vao SO
+   para o console/`backend.log`, jamais para respostas HTTP ao usuario.
+   URLs upstream com credenciais sao mascaradas (`maskUrl`).
+10. **Imagens do catalogo sao proxiadas** pelo backend (`GET /api/img?u=...`);
+    o frontend nunca carrega `http://*` direto (evita Mixed Content e nao
+    expoe dominios IPTV no HTML do site).

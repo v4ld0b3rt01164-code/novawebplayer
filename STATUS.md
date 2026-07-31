@@ -1,7 +1,9 @@
 # STATUS — NOVA Web Player
 
-Documento vivo do estado atual do projeto. Atualizado em: 2026-07-29
-(Favoritos: categoria dentro de Live, Movies e Series com persistencia localStorage).
+Documento vivo do estado atual do projeto. Atualizado em: 2026-07-30
+(Randomizacao dos servidores candidatos no login; proxy de imagens do catalogo
+resolvendo Mixed Content; logs legiveis silenciando o pino; **forçar hls.js no
+Chrome para resolver erro "Formato não suportado" em streams com áudio AC3/EAC3**).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
 ---
@@ -49,6 +51,7 @@ isolados no backend.
 | GET    | `/api/series/:series_id` | sim | info + temporadas + episodios |
 | GET    | `/api/epg` | sim | XMLTV parseado (cache 30 min) |
 | GET    | `/api/epg/channel/:epg_channel_id` | sim | EPG de um canal |
+| GET    | `/api/img?u=` | nao | proxy de imagens do catalogo (logos/capas) — resolve Mixed Content em HTTPS |
 | OPTIONS | `/stream/:type/:file` | sim | CORS preflight |
 | GET    | `/stream/:type/:file` | sim | proxy de playlist .m3u8 ou arquivo .mp4/.ts (com Range) |
 | GET    | `/stream/seg/:type/:file/:segment` | sim | proxy de segmento .ts (live) |
@@ -57,7 +60,24 @@ isolados no backend.
 
 ---
 
-## 4. Como funciona o proxy de streams
+## 4. Como funciona o proxy de streams e imagens
+
+### Imagens do catalogo (logos/capas)
+
+Logos de canais, capas de filmes, backdrops de series e imagens de
+episodios chegam do painel Xtream como URLs `http://` (ex:
+`http://img.hzplay.fun/...`, `http://st1.coverstmdb.xyz:8080/...`). Como o
+frontend roda em HTTPS, carregar essas URLs diretamente gera Mixed Content
+e o navegador bloqueia.
+
+Solucao: o `catalog.ts` reescreve cada URL de imagem para `/api/img?u=<url
+encoded>` (URL relativa -> mesma origem HTTPS). A rota `GET /api/img` no
+backend (`routes/img.ts`) busca o binario upstream via http/https e
+devolve via HTTPS, com cache de 24h. Sem auth (imagens de catalogo nao
+sao sensiveis; ha rate limit global protegendo abuso).
+
+Campos reescritos: `stream_icon` (live + vod), `cover` (vod info + series),
+`backdrop_path[]` (series + series info), `movie_image` (episodios).
 
 ### Live (HLS)
 
@@ -97,10 +117,17 @@ para buscar segmentos.
 
 ### Login
 1. `POST /api/auth` com `{ username, password }`.
-2. Backend tenta os 8 dominios em ordem, com timeout 5s. Sucesso = `user_info.auth === 1`.
-3. Token UUID guardado **apenas em memoria** (Context). Nenhum localStorage/sessionStorage.
-4. Proximas chamadas enviam `Authorization: Bearer <token>`.
-5. Erro 401 com mensagem generica (sem expor credenciais).
+2. Backend embaralha os 8 dominios (Fisher-Yates) e tenta em ordem aleatoria,
+   com timeout 5s cada. Cada login comeca por um servidor diferente, distribuindo
+   carga e evitando travar sempre no mesmo dominio instavel. Sucesso = `user_info.auth === 1`.
+3. Log legivel no console do backend: `[auth] login OK — servidor ativo: <host> (sessão <token>…)`.
+4. Token UUID guardado **apenas em memoria** (Context). Nenhum localStorage/sessionStorage.
+5. Proximas chamadas enviam `Authorization: Bearer <token>`.
+6. Erro 401 com mensagem generica (sem expor credenciais).
+7. **Fallback de stream reutiliza o mesmo `authenticate()` embaralhado** —
+   `reauthenticateSession()` (reauth.ts) exclui os dominios ja bloqueados da
+   sessao e embaralha os restantes, trocando de servidor automaticamente em
+   401/403 do upstream.
 
 ### Menu
 - 3 botoes com SVGs sem moldura (sem bg, ring, shadow, rounded).
@@ -125,7 +152,16 @@ para buscar segmentos.
 - **Layout split fixo (mobile)**: player + EPG em cima (`flex-shrink-0`), canais embaixo (`overflow-y-auto flex-1`).
 - **Maximizar**: botao de setas no canto do player -> tela inteira com EPG. Botao de voltar -> minimiza.
 - EPG now/next na lista de canais.
-- Player: hls.js (Chrome/Firefox) ou nativo (Safari).
+- Player: hls.js (Chrome/Firefox/Edge desktop) ou nativo (Safari macOS
+  + iOS). **Sempre hls.js em não-Safari/iOS (2026-07-30)** — antes o
+  Chrome usava HLS nativo quando `canPlayType('application/vnd.apple.mpegurl')`
+  retornava truthy, o que causava `MEDIA_ERR_SRC_NOT_SUPPORTED` em
+  poucos segundos em streams com áudio AC3/EAC3 (comum em IPTV BR,
+  ex.: A&E SD). hls.js é tolerante e toca o vídeo mesmo sem decodificar
+  o áudio incompatível. **iOS (qualquer browser, não só Safari) é
+  sempre roteado para HLS nativo** — todos os browsers iOS são WebKit
+  por baixo, e é o que as correções anteriores (iOS WebKit redirect,
+  `webkitAudioDecodedByteCount`) assumem.
 
 ### FILMES
 - Tela inicial: lista de categorias + busca geral.
@@ -176,10 +212,19 @@ para buscar segmentos.
 ## 6. Seguranca
 
 - Dominios IPTV **so no backend** (`backend/src/iptv/servers.ts`).
+- **Ordem dos dominios e randomizada por login** (Fisher-Yates em
+  `auth.ts:shuffle`). Cada login comeca por um servidor diferente, sem
+  viés; o fallback de stream re-embaralha os restantes (excluindo os ja
+  bloqueados da sessao). Nao hi hardcode de "servidor primario".
 - Credenciais **nunca** vao para o frontend. So trafegam em `POST /api/auth`.
 - Backend associa o servidor ativo ao token UUID em memoria (TTL 24h).
 - `localStorage` usado **apenas** para favoritos (IDs de itens, nao dados sensiveis).
 - Erros de login nao mencionam senha ou dominio.
+- **Logs do backend sao legiveis e isolados**: pino silenciado
+  (`logger.level: 'error'`); logs de negocio via `console.log` legiveis
+  (`[auth]`, `[stream]`, `[proxy]`, `[fallback]`, `[reauth]`) vao SO
+  para o console do backend e `backend.log`, jamais para o usuario
+  final. URLs upstream com credenciais sao mascaradas (`maskUrl`).
 - **Static serving via @fastify/static** (root fixo em `frontend/dist`;
   path traversal com `..` retorna 403). Nenhum caminho de arquivo e
   construido a partir de `req.url`.
@@ -189,6 +234,10 @@ para buscar segmentos.
   Cloudflare Tunnel (rate limit por usuario, nao por IP do tunnel).
 - **Headers de seguranca** no hook `onSend` (nosniff, DENY, HSTS, etc.) +
   `cache-control: no-store` forcado em respostas `text/html`.
+- **Proxy de imagens** (`GET /api/img`): so busca http:// ou https://,
+  nao exige auth, protegido pelo rate limit global. Resolve Mixed Content
+  sem expor dominios IPTV ao frontend (a URL do painel fica no query
+  param `u`, mas o host do backend e a mesma origem do site).
 - Detalhes e historico completo: `SECURITY.md`.
 
 ---
@@ -214,12 +263,17 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 ```
 
 ### Scripts Windows
-- `start.bat` - Inicia backend + tunnel
+- `start.bat` - Inicia backend + tunnel (sem janelas: `Start-Process -WindowStyle Hidden`)
 - `stop.bat` - Para tudo
-- `restart.bat` - Para e reinicia
+- `restart.bat` - Para e reinicia (sem janelas)
 - `status.bat` - Verifica saude (PM2, porta, build, health)
 - `install-startup.bat` - Instala auto-inicializacao via Task Scheduler
 - `uninstall-startup.bat` - Remove auto-inicializacao
+
+**Sem janelas abertas (2026-07-30)**: `start.bat` e `restart.bat` agora
+usam `powershell Start-Process -WindowStyle Hidden` em vez de
+`start /min cmd /c "..."`, entao nenhum `cmd.exe` fica visivel na
+taskbar ao iniciar/reiniciar. Processos rodam totalmente ocultos.
 
 ### Cloudflare Tunnel
 - Binario: `C:\Program Files (x86)\cloudflared\cloudflared.exe`
@@ -236,6 +290,10 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 ## 8. Verificacoes executadas
 
 - Login com fallback entre 8 dominios: OK
+- **Randomizacao dos dominios por login (Fisher-Yates): OK — cada login comeca por servidor diferente (validado em producao 2026-07-30, sessao em lidertv.xyz)**
+- **Logs legiveis no console do backend (`[auth]` servidor ativo, `[stream]` host por m3u8, `[proxy]` servidor real descoberto): OK — pino silenciado, sem vazamento para o frontend**
+- **Proxy de imagens do catalogo (`/api/img?u=...`) resolvendo Mixed Content: OK — logos/capas carregam via HTTPS mesma origem (validado 2026-07-30)**
+- **Scripts Windows sem janelas (Start-Process -WindowStyle Hidden): OK**
 - **Fallback em tempo real durante streaming (401/403): OK**
 - **Single-flight de re-autenticacao (concorrencia): OK**
 - TV ao vivo (HLS com proxy de segmentos): OK (desktop + mobile)
@@ -268,6 +326,11 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **Fallback transcode: tsc -b --noEmit + build OK; validado em iPhone (usuario real) — 2026-07-29**
 - **Sessao persistida em disco (sessions.json): OK**
 - **VOD iPhone (filmes + series): OK — iOS WebKit redirect para /transcode validado por usuario iPhone**
+- **Forçar hls.js no Chrome para AC3/EAC3 (live A&E SD no Chrome parava com
+  "Formato não suportado pelo navegador" após poucos segundos; no Firefox
+  rodava normal): OK — invertido `isSafari && canPlayType` para
+  `!isSafari && Hls.isSupported()` em `VideoPlayer.tsx:106-135`; typecheck +
+  build OK 2026-07-30**
 
 ---
 
@@ -292,6 +355,10 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - [x] ~~Auto-play primeiro canal~~ (implementado: useEffect + useRef)
 - [x] ~~Layout mobile series (poster+player+episodios)~~ (implementado: renderMode)
 - [x] ~~Favoritos~~ (implementado: categoria dentro de Live, Movies e Series com persistencia localStorage)
+- [x] ~~Randomizacao dos servidores por login~~ (implementado: Fisher-Yates em auth.ts 2026-07-30)
+- [x] ~~Proxy de imagens do catalogo (Mixed Content)~~ (implementado: /api/img + reescrita em catalog.ts 2026-07-30)
+- [x] ~~Logs legiveis no backend~~ (implementado: pino silenciado + logs [auth]/[stream]/[proxy] 2026-07-30)
+- [x] ~~Scripts Windows sem janelas abertas~~ (implementado: Start-Process -WindowStyle Hidden 2026-07-30)
 - [ ] **Fullscreen nativo no mobile** (requestFullscreen API no video — pendente)
 - [ ] EPG completo (xmltv parsing mais robusto)
 - [ ] Fallback de catalogo (categories/VOD) — mesma arquitetura de reauth.ts

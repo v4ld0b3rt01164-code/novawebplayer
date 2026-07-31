@@ -1,8 +1,8 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-29 (atualizado - Favoritos implementado em todas as secoes)
-**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos)
-**Checkpoint git**: ultimo commit: `0d25c7a` (fix: Live favoritos)
+**Data**: 2026-07-30 (atualizado - randomizacao servidores + proxy imagens + logs legiveis + hls.js forcado no Chrome)
+**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos + randomizacao + proxy imagens + Chrome AC3/EAC3 via hls.js)
+**Checkpoint git**: ultimo commit: `0d25c7a` (fix: Live favoritos) — pendente novo checkpoint apos validacao
 **Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo).
 
 ---
@@ -40,6 +40,7 @@ scripts\windows\restart.bat
 | Tag | Estado |
 |---|---|
 | `0d25c7a` | Favoritos em Live, Movies e Series — singleton compartilhado + endpoints com category_id opcional |
+| _pendente_ | 2026-07-30: randomizacao Fisher-Yates + proxy imagens /api/img + logs legiveis + scripts sem janelas |
 | `checkpoint-2026-07-18` | player fixo no topo SeriesScreen desktop (fixed inset-0 z-50) + useIsDesktopViewport evita 2 VideoPlayers |
 | `checkpoint-2026-07-17-transcode-fallback` | + fallback automatico /stream -> /transcode no player (iOS AC3/EAC3 + heuristica "toca mudo") |
 | `checkpoint-2026-07-17` | seguranca: path traversal corrigido + rate limiting + trustProxy |
@@ -87,6 +88,10 @@ commitado corresponder ao codigo-fonte.
 ## O que funciona
 
 - [x] Login com fallback entre 8 dominios IPTV
+- [x] **Randomizacao dos dominios por login** (Fisher-Yates — cada login comeca por servidor diferente; fallback re-embaralha restantes)
+- [x] **Proxy de imagens do catalogo** (`/api/img?u=...`) resolve Mixed Content (logos/capas via HTTPS mesma origem)
+- [x] **Logs legiveis isolados no backend** (`[auth]`, `[stream]`, `[proxy]`, `[fallback]`, `[reauth]`; pino silenciado; sem vazamento ao frontend)
+- [x] **Scripts Windows sem janelas** (`Start-Process -WindowStyle Hidden` em start.bat/restart.bat)
 - [x] **Fallback em tempo real durante streaming** (re-autenticacao automatica em 401/403)
 - [x] TV ao vivo (HLS via proxy com descoberta de servidor real)
 - [x] **Auto-play primeiro canal ao entrar na pasta** (miniplayer ja inicia reproduzindo)
@@ -110,6 +115,7 @@ commitado corresponder ao codigo-fonte.
 - [x] **Rate limiting** (300 req/min global + 5 req/min em POST /api/auth, por IP real via trustProxy)
 - [x] **index.html sempre no-store** (hook onSend forca em text/html; assets com hash mantem cache 30d)
 - [x] **Fallback automatico para transcode** (erro de codec no <video>/hls.js OU "toca mudo" no iOS/WebKit -> troca para /transcode/... ffmpeg H.264/AAC, 1x por sessao de reproducao)
+- [x] **hls.js forcado em nao-Safari/iOS** (2026-07-30) — Chrome desktop usava HLS nativo e abortava streams com audio AC3/EAC3 (A&E SD) com MEDIA_ERR_SRC_NOT_SUPPORTED em poucos segundos. Invertido para hls.js primeiro; Safari/iOS continuam em HLS nativo.
 - [x] **Sessao persistida em disco** (sessions.json com debounced write, sobrevive a restarts do backend)
 
 ---
@@ -123,21 +129,22 @@ NOVAWEBPLAYER/
 │   │   ├── index.ts                    # Fastify bootstrap + @fastify/static + rate limit + trustProxy
 │   │   ├── iptv/
 │   │   │   ├── servers.ts              # Lista dos 8 dominios candidatos
-│   │   │   ├── auth.ts                 # Fallback + autenticacao Xtream (+ excludeBaseUrls)
-│   │   │   ├── catalog.ts              # Proxy de catalogo
+│   │   │   ├── auth.ts                 # Fallback + autenticacao Xtream (com shuffle Fisher-Yates)
+│   │   │   ├── catalog.ts              # Proxy de catalogo (reescreve URLs de imagem -> /api/img)
 │   │   │   ├── epg.ts                  # Parse xmltv + cache 30min
 │   │   │   ├── proxy.ts                # Proxy de streams + UpstreamHttpError
 │   │   │   ├── reauth.ts               # Re-autenticacao com single-flight
 │   │   │   ├── withFallback.ts         # Wrapper de fallback para streams
 │   │   │   └── categoryOrder.ts        # Ordenacao de categorias
 │   │   ├── routes/
-│   │   │   ├── auth.ts                 # POST /api/auth
-│   │   │   ├── stream.ts               # GET /stream/:type/:file + /seg/ (com fallback)
+│   │   │   ├── auth.ts                 # POST /api/auth (log [auth] servidor ativo)
+│   │   │   ├── stream.ts               # GET /stream/:type/:file + /seg/ (com fallback + log [stream])
 │   │   │   ├── streamAuth.ts           # Auth via header ou ?token=
 │   │   │   ├── live.ts                 # /api/live/*
 │   │   │   ├── movies.ts               # /api/movies/*
 │   │   │   ├── series.ts               # /api/series/*
 │   │   │   ├── epg.ts                  # /api/epg/*
+│   │   │   ├── img.ts                  # GET /api/img?u=... (proxy de imagens do catalogo)
 │   │   │   └── middleware.ts           # requireAuth
 │   │   └── session/
 │   │       └── store.ts                # Sessoes persistidas em disco (sessions.json) + blockedServers + updateSessionServer
@@ -347,8 +354,10 @@ git reset --hard checkpoint-2026-07-18   # RESTAURAR (descarta mudancas!)
 5. **Mobile precisa de Range**: Sem Range requests, o browser nao inicia
    playback de mp4 grandes.
 
-6. **VideoPlayer detecta extensao**: `.m3u8` usa hls.js, qualquer outra usa
-   `<video>` nativo.
+6. **VideoPlayer detecta extensao e plataforma**: `.m3u8` usa hls.js em
+   Chrome/Firefox/Edge desktop, ou HLS nativo em Safari/iOS (qualquer
+   browser iOS — AGENTS.md §Stack: "Safari/iOS não deve usar hls.js").
+   Qualquer outra extensao usa `<video>` nativo direto.
 
 7. **Frontend e servido pelo backend**: Nao usar Cloudflare Pages para o
    frontend (evita CORS).
@@ -373,6 +382,10 @@ git reset --hard checkpoint-2026-07-18   # RESTAURAR (descarta mudancas!)
 - [x] ~~Layout split fixo para TV/series~~ (implementado: fixed inset-0 z-50)
 - [x] ~~Auto-play primeiro canal~~ (implementado: useEffect + useRef)
 - [x] ~~Layout mobile series (poster+player+episodios)~~ (implementado: renderMode)
+- [x] ~~Randomizacao dos servidores por login~~ (Fisher-Yates 2026-07-30)
+- [x] ~~Proxy de imagens do catalogo~~ (/api/img + reescrita em catalog.ts 2026-07-30)
+- [x] ~~Logs legiveis no backend~~ (pino silenciado + logs [auth]/[stream]/[proxy] 2026-07-30)
+- [x] ~~Scripts Windows sem janelas~~ (Start-Process -WindowStyle Hidden 2026-07-30)
 - [ ] **Fullscreen nativo no mobile** (requestFullscreen API no video — pendente)
 - [ ] EPG completo (xmltv parsing)
 - [ ] Fallback de catalogo (categories/VOD) — reutilizando reauth.ts + withFallback.ts
