@@ -103,7 +103,28 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
       return
     }
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Regra de seleção do pipeline HLS (ver AGENTS.md §Stack):
+    //   "Safari/iOS não deve usar hls.js — usar reprodução nativa lá"
+    // - iOS (qualquer browser): HLS nativo (todos os browsers iOS são
+    //   WebKit/Safari por baixo dos panos; mesmo iOS Chrome/Firefox usam
+    //   o engine HLS do sistema, que é mais permissivo que o do Chrome
+    //   desktop e lida bem com AC3/EAC3). É o que o iOS WebKit redirect
+    //   acima e a heurística "toca mudo" (webkitAudioDecodedByteCount)
+    //   assumem.
+    // - Safari macOS: HLS nativo também (engine mais completo que hls.js).
+    // - Demais (Chrome desktop, Firefox, Edge): hls.js. Razão: o HLS
+    //   nativo do Chrome desktop é estrito com codecs — streams com
+    //   áudio AC3/EAC3 (comum em IPTV BR, ex.: A&E SD) fazem o
+    //   <video> abortar com MEDIA_ERR_SRC_NOT_SUPPORTED em poucos
+    //   segundos. hls.js é tolerante e toca o vídeo mesmo sem
+    //   decodificar o áudio incompatível.
+    const ua = navigator.userAgent
+    const isSafari = /^((?!chrome|android).)*safari/i.test(ua)
+    const isIOS = /iP(hone|ad|od)/.test(ua)
+    const useNativeHls =
+      (isSafari || isIOS) && !!video.canPlayType('application/vnd.apple.mpegurl')
+
+    if (useNativeHls) {
       video.src = url
       video.play().catch(() => {})
     } else if (Hls.isSupported()) {
