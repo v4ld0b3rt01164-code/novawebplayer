@@ -1,5 +1,13 @@
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify'
 import { requireStreamAuth } from './streamAuth.js'
+import {
+  fetchRewrittenPlaylist,
+  fetchUpstreamSegment,
+  fetchUpstreamRaw,
+  resolveSegmentUrl,
+  buildUpstreamUrl,
+} from '../iptv/proxy.js'
+import { withUpstreamFallback } from '../iptv/withFallback.js'
 
 /** Mascarar senha em URL upstream para logs seguros. */
 function maskUrl(url: string): string {
@@ -16,14 +24,17 @@ function maskUrl(url: string): string {
     return url
   }
 }
-import {
-  fetchRewrittenPlaylist,
-  fetchUpstreamSegment,
-  fetchUpstreamRaw,
-  resolveSegmentUrl,
-  buildUpstreamUrl,
-} from '../iptv/proxy.js'
-import { withUpstreamFallback } from '../iptv/withFallback.js'
+
+function contentTypeForFile(file: string, upstreamContentType: string): string {
+  const extension = file.split('?')[0].split('.').pop()?.toLowerCase()
+
+  // Some IPTV panels return application/octet-stream (or another generic
+  // type) for valid MP4 files. Mobile browsers are stricter when nosniff is
+  // enabled, so use the container's canonical MIME type at our boundary.
+  if (extension === 'mp4' || extension === 'm4v') return 'video/mp4'
+  if (extension === 'webm') return 'video/webm'
+  return upstreamContentType
+}
 
 const streamRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   app.addHook('preHandler', requireStreamAuth)
@@ -74,7 +85,7 @@ const streamRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           return fetchUpstreamRaw(upstreamUrl, rangeHeader)
         })
 
-      reply.header('content-type', contentType)
+      reply.header('content-type', contentTypeForFile(file, contentType))
       reply.header('accept-ranges', 'bytes')
       if (contentRange) {
         reply.header('content-range', contentRange)

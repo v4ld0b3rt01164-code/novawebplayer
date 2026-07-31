@@ -5,11 +5,11 @@
  * protegidos por sessão do painel) e gera HLS local com -c copy
  * (sem re-encoding, rápido).
  *
- * Para MOVIE/SERIES: baixa o MP4 upstream e gera HLS local com
- * transcodificação para H.264/AAC (resolve codec incompatível).
+ * Para MOVIE/SERIES: baixa o arquivo upstream e gera MP4 local com
+ * transcodificacao para H.264/AAC (resolve codec incompatível).
  *
  * O frontend consome sempre /transcode/<type>/<file>?token=<uuid> e
- * o player recebe um HLS local em H.264/AAC.
+ * recebe HLS apenas para LIVE e MP4 progressivo para VOD.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, statSync, createReadStream } from 'node:fs';
@@ -48,14 +48,17 @@ async function waitForFirstSegment(dir, timeoutMs) {
 }
 /**
  * Inicia (ou reutiliza) o pipeline ffmpeg para o stream.
- * Retorna o diretório onde o m3u8 e os segmentos são gerados.
+ * Retorna o diretório onde o resultado transcodificado é gerado.
  */
 export async function startTranscode(session, type, file) {
     const k = key(session, type, file);
     const existing = states.get(k);
     if (existing) {
-        existing.lastAccess = Date.now();
-        return existing.dir;
+        if (!existing.failed && !(existing.completed && type === 'live')) {
+            existing.lastAccess = Date.now();
+            return existing.dir;
+        }
+        states.delete(k);
     }
     const dir = safeDir(session, type, file);
     await ensureDir(dir);
@@ -71,6 +74,7 @@ export async function startTranscode(session, type, file) {
     }
     const playlist = path.join(dir, 'index.m3u8');
     const segPattern = path.join(dir, 'seg_%05d.ts');
+    const output = vodPath(dir);
     const upstreamUrl = buildUpstreamUrl(session, type, file);
     const args = [
         '-hide_banner',
@@ -86,35 +90,64 @@ export async function startTranscode(session, type, file) {
         args.push('-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-ac', '2');
     }
     else {
-        // VOD/Séries: transcodifica para H.264/AAC (resolve HEVC/AC3).
-        args.push('-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-g', '60', '-sc_threshold', '0', '-c:a', 'aac', '-b:a', '128k', '-ac', '2');
+        // VOD/Séries: entrega MP4 progressivo H.264/AAC (resolve HEVC/AC3)
+        // para que Safari preserve a semantica de VOD e suporte seek via Range.
+        args.push('-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-g', '60', '-sc_threshold', '0', '-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-movflags', '+faststart', '-f', 'mp4');
     }
-    args.push('-f', 'hls', '-hls_time', type === 'live' ? '4' : '6', '-hls_list_size', type === 'live' ? '6' : '0', '-hls_flags', 'temp_file', '-hls_segment_filename', segPattern, playlist);
+    if (type === 'live') {
+        args.push('-f', 'hls', '-hls_time', '4', '-hls_list_size', '6', '-hls_flags', 'temp_file', '-hls_segment_filename', segPattern, playlist);
+    }
+    else {
+        args.push(output);
+    }
     const proc = spawn(FFMPEG_BIN, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
     });
+    let finish;
+    const completion = new Promise((resolve) => {
+        finish = resolve;
+    });
+    const state = {
+        proc,
+        dir,
+        type,
+        file,
+        lastAccess: Date.now(),
+        session,
+        completed: false,
+        failed: false,
+        completion,
+    };
+    states.set(k, state);
     proc.stderr?.on('data', () => {
         // silencioso: ffmpeg já imprime com -loglevel error
     });
     proc.on('error', (err) => {
+        state.failed = true;
+        finish(false);
         console.error('[transcode] erro ao iniciar ffmpeg:', err.message);
     });
     proc.on('exit', (code) => {
         console.log(`[transcode] ffmpeg saiu (code=${code}) key=${k}`);
-        const state = states.get(k);
-        if (state && code !== 0 && Date.now() - state.lastAccess < 120_000) {
+        if (code === 0) {
+            state.completed = true;
+            finish(true);
+            return;
+        }
+        if (type === 'live' && Date.now() - state.lastAccess < 120_000) {
             console.log(`[transcode] reiniciando ffmpeg para ${k}`);
             states.delete(k);
+            finish(false);
             startTranscode(state.session, type, file).catch((err) => {
                 console.error('[transcode] falha ao reiniciar:', err.message);
             });
         }
         else {
-            states.delete(k);
+            state.failed = true;
+            finish(false);
         }
     });
-    states.set(k, { proc, dir, type, file, lastAccess: Date.now(), session });
     // Limpeza automática
     scheduleIdleCleanup();
     return dir;
@@ -152,6 +185,17 @@ export function getDir(session, type, file) {
 export function playlistPath(dir) {
     return path.join(dir, 'index.m3u8');
 }
+export function vodPath(dir) {
+    return path.join(dir, 'output.mp4');
+}
+export function vodStat(dir) {
+    if (!existsSync(vodPath(dir)))
+        return null;
+    return statSync(vodPath(dir));
+}
+export function readVodStream(dir, start, end) {
+    return createReadStream(vodPath(dir), { start, end });
+}
 export function segmentPath(dir, segment) {
     // Anti path traversal
     if (segment.includes('..') || segment.includes('/') || segment.includes('\\')) {
@@ -173,5 +217,19 @@ export function segmentStat(dir, segment) {
 }
 export async function waitForFirstSeg(dir, timeoutMs = 20_000) {
     return waitForFirstSegment(dir, timeoutMs);
+}
+export async function waitForVodTranscode(session, type, file, timeoutMs = 300_000) {
+    const state = states.get(key(session, type, file));
+    if (!state)
+        return false;
+    if (state.completed)
+        return vodStat(state.dir) !== null;
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(false), timeoutMs);
+        state.completion.then((success) => {
+            clearTimeout(timer);
+            resolve(success && vodStat(state.dir) !== null);
+        });
+    });
 }
 //# sourceMappingURL=transcode.js.map

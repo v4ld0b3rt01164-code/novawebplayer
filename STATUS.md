@@ -2,7 +2,8 @@
 
 Documento vivo do estado atual do projeto. Atualizado em: 2026-07-31
 (Login aleatorio entre 8 dominios; monitor local de sessoes; restart sem janelas visiveis;
-Favoritos: categoria dentro de Live, Movies e Series com persistencia localStorage).
+Favoritos: categoria dentro de Live, Movies e Series com persistencia localStorage;
+fallback mobile para VOD com formato/codec recusado).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
 ---
@@ -53,8 +54,8 @@ isolados no backend.
 | OPTIONS | `/stream/:type/:file` | sim | CORS preflight |
 | GET    | `/stream/:type/:file` | sim | proxy de playlist .m3u8 ou arquivo .mp4/.ts (com Range) |
 | GET    | `/stream/seg/:type/:file/:segment` | sim | proxy de segmento .ts (live) |
-| GET    | `/transcode/:type/:file` | sim | HLS transcodificado via ffmpeg (H.264/AAC) — fallback do player; responde SEMPRE .m3u8, mesmo com .mp4 no path |
-| GET    | `/transcode/seg/:type/:file/:segment` | sim | segmento do HLS transcodificado |
+| GET    | `/transcode/:type/:file` | sim | LIVE retorna HLS; MOVIES/SERIES retornam MP4 H.264/AAC com Range |
+| GET    | `/transcode/seg/:type/:file/:segment` | sim | segmento HLS transcodificado (LIVE) |
 
 ---
 
@@ -79,10 +80,15 @@ isolados no backend.
 
 **NOTA iOS (2026-07-29)**: No iOS Safari, o VideoPlayer detecta automaticamente
 a ausencia de MSE (`!Hls.isSupported()`) com suporte a HLS nativo e redireciona
-VOD nao-HLS (.mp4/.mkv) direto para `/transcode/...` (ffmpeg H.264/AAC HLS),
-evitando completamente a deteccao nao-conflavel de erro de codec no iOS. O
-fallback reativo (onerror, webkitAudioDecodedByteCount) continua ativo para
-macOS Safari e outros cenarios.
+VOD nao-HLS (.mp4/.mkv) direto para `/transcode/...`. O backend entrega esse
+fallback como MP4 H.264/AAC progressivo, evitando codec incompatível sem fazer
+o Safari tratar o filme como uma transmissao HLS.
+
+**NOTA mobile (2026-07-31)**: Em Android e nos casos em que o navegador rejeita
+`video.play()` com `NotSupportedError` sem emitir `error` de forma confiavel, o
+VideoPlayer agora aciona o mesmo fallback `/transcode/...`. O listener de erro e
+registrado antes da primeira carga. O proxy tambem entrega `video/mp4` para
+arquivos `.mp4`/`.m4v`, mesmo quando o painel retorna MIME generico.
 
 ### Descoberta do servidor real
 
@@ -158,20 +164,39 @@ para buscar segmentos.
   direto. Isso resolve o erro "formato nao suportado" no iPhone para VOD com
   codecs incompatíveis (HEVC, AC3, MKV, etc.). macOS Safari (tem MSE) e live
   (.m3u8) nao sao afetados.
-- URLs `/transcode/...` -> SEMPRE HLS, independente da extensao no path.
+- `/transcode/live/...` -> HLS; `/transcode/movie/...` e `/transcode/series/...` -> MP4 progressivo.
 - Auto-unmute apos playback iniciar.
 - Retry automatico em caso de erro de rede (ate 5x).
 - **Fallback automatico para `/transcode/...`** (prop `fallbackSrc`, 1x por
   sessao de reproducao via `triedFallbackRef`), acionado por:
+  - rejeicao `NotSupportedError` da Promise de `video.play()` (mobile);
   - erro do `<video>` code 3 (DECODE) ou 4 (SRC_NOT_SUPPORTED);
   - hls.js MEDIA_ERROR fatal com retries esgotados, ou OTHER_ERROR fatal;
   - **heuristica "toca mudo" (so WebKit/iOS)**: `webkitAudioDecodedByteCount`
     igual a 0 apos 3s de reproducao ativa (desmutado, nao pausado,
     currentTime avancando) — cobre video H.264 + audio AC3/EAC3 que o iOS
     toca sem som e sem disparar erro.
-  - Tela de erro so aparece se a fonte direta E o transcode falharem;
-    "Tentar novamente" reseta para a fonte direta.
+- Tela de erro so aparece se a fonte direta E o transcode falharem;
+  "Tentar novamente" reseta para a fonte direta.
 - Media Session API para controles de lock screen.
+
+### Correcao de compatibilidade VOD mobile (2026-07-31)
+
+- Causa identificada: o fallback antigo convertia Filmes/Séries para HLS. O
+  Safari apresentava a etiqueta "Transmissao ao Vivo" mesmo sendo VOD.
+- Correcao: somente Live usa HLS. Filmes e Séries usam MP4 progressivo
+  transcodificado em H.264/AAC, com `yuv420p`, `faststart` e `Range`.
+- Android/desktop mantêm a fonte direta como primeira tentativa; o fallback e
+  acionado por `NotSupportedError` ou erro de mídia. No WebKit/iPhone, o VOD
+  usa o MP4 transcodificado preventivamente porque alguns codecs falham sem
+  emitir erro confiavel; nunca e convertido para HLS.
+- Arquivos principais: `frontend/src/player/VideoPlayer.tsx`,
+  `frontend/src/api/streamUrl.ts`, `backend/src/iptv/transcode.ts` e
+  `backend/src/routes/transcode.ts`.
+- Artefatos compilados correspondentes ficam em `frontend/dist` e
+  `backend/dist`.
+- Validacao em dispositivo real: pendente após reinício do backend, cobrindo
+  iPhone Safari, iPhone Chrome, Android e um conteúdo VOD que falhava.
 
 ---
 
@@ -269,9 +294,9 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **Home `/`, `/index.html`, SPA fallback (`/live` com F5): 200 com no-store**
 - **Assets `/assets/*`: 200 com cache 30d immutable**
 - **Rate limit login: 6 tentativas seguidas → 5x 401 + 1x 429**
-- **Fallback transcode: tsc -b --noEmit + build OK; validado em iPhone (usuario real) — 2026-07-29**
+- **Fallback transcode: typecheck/build OK; rejeicao `NotSupportedError`, MIME MP4 e VOD sem HLS cobertos — 2026-07-31**
 - **Sessao persistida em disco (sessions.json): OK**
-- **VOD iPhone (filmes + series): OK — iOS WebKit redirect para /transcode validado por usuario iPhone**
+- **VOD mobile (filmes + series): aguardando validacao real em Safari/Chrome iPhone e Android**
 - **Login com ordem aleatoria entre 8 dominios: typecheck/build OK; lint OK com aviso preexistente**
 - **Monitor local de sessoes (`monitor-server.bat`): OK; nao exibe credenciais ou tokens**
 - **`restart.bat` com backend e tunnel ocultos: validado por sintaxe e logs redirecionados**
@@ -307,6 +332,6 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - [ ] Chromecast/AirPlay (v2)
 - [ ] Testes automatizados (vitest backend, playwright frontend)
 - [ ] Layout responsivo avancado (grid dinamico para telas intermediarias)
-- [x] ~~Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3~~ (implementado: fallback automatico no player + iOS WebKit redirect)
-- [x] ~~VOD iPhone (filmes/series) — iOS WebKit redirect para /transcode~~ (validado por usuario iPhone 2026-07-29)
+- [x] ~~Transcodificacao de compatibilidade~~ (LIVE -> HLS; MOVIES/SERIES -> MP4 H.264/AAC progressivo)
+- [ ] Validar VOD transcodificado em iPhone e Android com conteudo que falha no arquivo direto
 - [ ] Limite de processos ffmpeg concorrentes (iptv/transcode.ts)

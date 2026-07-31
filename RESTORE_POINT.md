@@ -1,7 +1,7 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-31 (monitor local + restart sem janelas visiveis)
-**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos + login aleatorio + monitor local)
+**Data**: 2026-07-31 (correcao VOD mobile + monitor local + restart sem janelas visiveis)
+**Status**: BUILD VALIDADO; teste real pendente para VOD transcodificado em iPhone Safari/Chrome e Android
 **Checkpoint git**: `checkpoint-2026-07-31-monitor`
 **Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo).
 
@@ -112,7 +112,8 @@ commitado corresponder ao codigo-fonte.
 - [x] **Static serving seguro** (@fastify/static; path traversal bloqueado com 403)
 - [x] **Rate limiting** (300 req/min global + 5 req/min em POST /api/auth, por IP real via trustProxy)
 - [x] **index.html sempre no-store** (hook onSend forca em text/html; assets com hash mantem cache 30d)
-- [x] **Fallback automatico para transcode** (erro de codec no <video>/hls.js OU "toca mudo" no iOS/WebKit -> troca para /transcode/... ffmpeg H.264/AAC, 1x por sessao de reproducao)
+- [x] **Fallback automatico para transcode** (Live -> HLS; Filmes/Séries -> MP4 H.264/AAC progressivo; erro de codec, `NotSupportedError` ou "toca mudo" no iOS/WebKit)
+- [x] **Fallback mobile VOD** (rejeicao `NotSupportedError` de `video.play()` capturada; listener registrado antes da primeira carga; MIME `.mp4` normalizado no proxy)
 - [x] **Sessao persistida em disco** (sessions.json com debounced write, sobrevive a restarts do backend)
 
 ---
@@ -235,14 +236,18 @@ demais aguardam a mesma Promise.
 ### Fallback de compatibilidade (transcode ffmpeg)
 
 Quando o NAVEGADOR (nao o upstream) nao consegue reproduzir a fonte
-direta `/stream/...`, o player troca automaticamente para
-`/transcode/...` (ffmpeg -> HLS H.264/AAC), uma unica vez por sessao de
-reproducao (`triedFallbackRef`):
+direta `/stream/...`, o player troca automaticamente para `/transcode/...`
+(ffmpeg -> H.264/AAC), uma unica vez por sessao de reproducao
+(`triedFallbackRef`). O fallback de LIVE e HLS; MOVIES/SERIES sao MP4
+progressivo.
 
 1. **Erro real de midia**: `error` do `<video>` com code 3
    (MEDIA_ERR_DECODE) ou 4 (MEDIA_ERR_SRC_NOT_SUPPORTED); no hls.js,
    MEDIA_ERROR fatal com retries esgotados ou OTHER_ERROR fatal.
-2. **Heuristica "toca mudo" (so WebKit/iOS)**: video H.264 + audio
+2. **Promise de playback**: `NotSupportedError` retornado por `video.play()`
+   tambem aciona o fallback, cobrindo browsers moveis que nao disparam o
+   evento `error` a tempo.
+3. **Heuristica "toca mudo" (so WebKit/iOS)**: video H.264 + audio
    AC3/EAC3 toca SEM erro no iOS, descartando o audio. Detectado via
    `webkitAudioDecodedByteCount === 0` apos 3s de reproducao ativa
    (desmutado, nao pausado, currentTime avancando). Propriedade so
@@ -251,9 +256,9 @@ reproducao (`triedFallbackRef`):
 A tela de erro so aparece se a fonte direta E o transcode falharem.
 "Tentar novamente" volta para a fonte direta (reseta a sessao).
 
-**IMPORTANTE**: `/transcode/:type/:file` responde SEMPRE playlist HLS,
-mesmo com `.mp4`/`.mkv` no path — o player trata qualquer URL
-`/transcode/` como HLS independente da extensao.
+**IMPORTANTE**: somente `/transcode/live/...` responde playlist HLS.
+`/transcode/movie/...` e `/transcode/series/...` respondem `video/mp4` com
+suporte a Range, preservando a semantica de VOD no Safari/iOS.
 
 **Arquivos envolvidos**:
 - `frontend/src/api/streamUrl.ts` — `liveTranscodeUrl()`, `movieTranscodeUrl()`, `seriesTranscodeUrl()`
@@ -390,5 +395,5 @@ git reset --hard checkpoint-2026-07-18   # RESTAURAR (descarta mudancas!)
 - [ ] PWA manifest
 - [ ] Download offline (v2)
 - [ ] Chromecast/AirPlay (v2)
-- [x] ~~Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3~~ (implementado: fallback automatico no player via /transcode/...)
+- [x] ~~Transcodificacao de compatibilidade~~ (LIVE -> HLS; VOD -> MP4 H.264/AAC via /transcode/...)
 - [ ] Limite de processos ffmpeg concorrentes em iptv/transcode.ts (risco de CPU se muitos fallbacks simultaneos)

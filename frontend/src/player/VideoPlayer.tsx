@@ -6,7 +6,7 @@ interface VideoPlayerProps {
   title?: string
   poster?: string
   /**
-   * URL alternativa via /transcode/... (ffmpeg -> HLS H.264/AAC).
+   * URL alternativa via /transcode/... (ffmpeg -> H.264/AAC).
    * Tentada automaticamente UMA vez quando o navegador reporta erro
    * real de reprodução na src principal (codec/formato não suportado,
    * ex.: áudio AC3/EAC3 no iOS). A src principal continua sendo sempre
@@ -78,7 +78,7 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
 
     // iOS Safari não suporta MSE (hls.js) e frequentemente não consegue
     // decodificar VOD não-HLS (MP4/MKV com codecs incompatíveis).
-    // Redireciona para o pipeline de transcode (H.264/AAC HLS) imediatamente.
+    // Redireciona para o pipeline de transcode H.264/AAC imediatamente.
     const isIOSWebKit =
       !Hls.isSupported() &&
       typeof document !== 'undefined' &&
@@ -88,24 +88,49 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
       const cp = url.split('?')[0]
       if (!cp.endsWith('.m3u8') && !cp.startsWith('/transcode/')) {
         url = fallbackSrc
+        activeSrcRef.current = fallbackSrc
+        triedFallbackRef.current = true
       }
+    }
+
+    const playVideo = () => {
+      video.play().catch((reason: unknown) => {
+        const errorName =
+          reason && typeof reason === 'object' && 'name' in reason
+            ? String((reason as { name?: unknown }).name)
+            : ''
+        const mediaErrorCode = video.error?.code
+        const unsupported =
+          errorName === 'NotSupportedError' ||
+          mediaErrorCode === 3 ||
+          mediaErrorCode === 4
+
+        // Mobile Safari/Chrome can reject play() without reliably emitting
+        // the media error event. Do not swallow that signal: it is the exact
+        // point where the H.264/AAC fallback is needed.
+        if (!unsupported) return
+        if (tryFallback()) return
+
+        setError('Formato não suportado pelo navegador.')
+        setLoading(false)
+      })
     }
 
     const cleanPath = url.split('?')[0]
     const ext = cleanPath.split('.').pop()?.toLowerCase() ?? ''
-    // /transcode/... responde SEMPRE playlist HLS, mesmo com extensão
-    // .mp4/.mkv no path — tratar como HLS independente da extensão.
-    const isHls = ext === 'm3u8' || cleanPath.startsWith('/transcode/')
+    // Apenas o fallback de LIVE responde HLS. VOD/Séries continuam MP4
+    // progressivo para que o Safari não trate o conteúdo como transmissão.
+    const isHls = ext === 'm3u8' || cleanPath.startsWith('/transcode/live/')
 
     if (!isHls) {
       video.src = url
-      video.play().catch(() => {})
+      playVideo()
       return
     }
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = url
-      video.play().catch(() => {})
+      playVideo()
     } else if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
@@ -157,21 +182,13 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
       video.play().catch(() => {})
     } else {
       video.src = url
-      video.play().catch(() => {})
+      playVideo()
     }
-  }, [src, destroyHls, tryFallback])
+  }, [src, destroyHls, clearAudioProbe, tryFallback, fallbackSrc])
 
   useEffect(() => {
     startPlaybackRef.current = startPlayback
   }, [startPlayback])
-
-  useEffect(() => {
-    if (srcRef.current === src) return
-    srcRef.current = src
-    triedFallbackRef.current = false
-    activeSrcRef.current = src
-    startPlayback()
-  }, [src, startPlayback])
 
   useEffect(() => {
     const video = videoRef.current
@@ -240,6 +257,14 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
       if ('mediaSession' in navigator) navigator.mediaSession.metadata = null
     }
   }, [title, tryFallback, clearAudioProbe])
+
+  useEffect(() => {
+    if (srcRef.current === src) return
+    srcRef.current = src
+    triedFallbackRef.current = false
+    activeSrcRef.current = src
+    startPlayback()
+  }, [src, startPlayback])
 
   useEffect(() => {
     return () => destroyHls()
