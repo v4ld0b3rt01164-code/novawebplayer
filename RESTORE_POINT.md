@@ -1,8 +1,8 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-29 (atualizado - Favoritos implementado em todas as secoes)
-**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos)
-**Checkpoint git**: ultimo commit: `0d25c7a` (fix: Live favoritos)
+**Data**: 2026-07-31 (login com ordem aleatoria entre 8 dominios)
+**Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos + login aleatorio)
+**Checkpoint git**: `checkpoint-2026-07-31`
 **Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo).
 
 ---
@@ -21,13 +21,13 @@ cd C:\Users\Valdo\Desktop\TUDO\SITES\DEV\NOVAWEBPLAYER
 
 # 1. Ver o que mudou desde o checkpoint (opcional)
 git status
-git diff checkpoint-2026-07-18
+git diff checkpoint-2026-07-31
 
 # 2. Guardar mudancas atuais em andamento (opcional, recuperavel depois)
 git stash push -u -m "antes de restaurar"
 
 # 3. Voltar TODO o codigo ao estado do checkpoint (descarta mudancas!)
-git reset --hard checkpoint-2026-07-18
+git reset --hard checkpoint-2026-07-31
 
 # 4. Restaurar dependencias exatas e reiniciar
 cd backend; npm install; cd ..
@@ -39,6 +39,7 @@ scripts\windows\restart.bat
 
 | Tag | Estado |
 |---|---|
+| `checkpoint-2026-07-31` | Login com ordem aleatoria segura entre os 8 dominios + fallback preservado; builds do backend atualizados |
 | `0d25c7a` | Favoritos em Live, Movies e Series — singleton compartilhado + endpoints com category_id opcional |
 | `checkpoint-2026-07-18` | player fixo no topo SeriesScreen desktop (fixed inset-0 z-50) + useIsDesktopViewport evita 2 VideoPlayers |
 | `checkpoint-2026-07-17-transcode-fallback` | + fallback automatico /stream -> /transcode no player (iOS AC3/EAC3 + heuristica "toca mudo") |
@@ -86,7 +87,7 @@ commitado corresponder ao codigo-fonte.
 
 ## O que funciona
 
-- [x] Login com fallback entre 8 dominios IPTV
+- [x] Login com ordem aleatoria e fallback entre 8 dominios IPTV (`crypto.randomInt` + Fisher-Yates)
 - [x] **Fallback em tempo real durante streaming** (re-autenticacao automatica em 401/403)
 - [x] TV ao vivo (HLS via proxy com descoberta de servidor real)
 - [x] **Auto-play primeiro canal ao entrar na pasta** (miniplayer ja inicia reproduzindo)
@@ -123,7 +124,7 @@ NOVAWEBPLAYER/
 │   │   ├── index.ts                    # Fastify bootstrap + @fastify/static + rate limit + trustProxy
 │   │   ├── iptv/
 │   │   │   ├── servers.ts              # Lista dos 8 dominios candidatos
-│   │   │   ├── auth.ts                 # Fallback + autenticacao Xtream (+ excludeBaseUrls)
+│   │   │   ├── auth.ts                 # Ordem aleatoria + fallback Xtream (+ excludeBaseUrls)
 │   │   │   ├── catalog.ts              # Proxy de catalogo
 │   │   │   ├── epg.ts                  # Parse xmltv + cache 30min
 │   │   │   ├── proxy.ts                # Proxy de streams + UpstreamHttpError
@@ -212,7 +213,7 @@ Quando o upstream retorna 401/403 em qualquer chamada de stream
 (playlist .m3u8, arquivo raw, ou segmento .ts), o backend:
 
 1. **Detecta** via `UpstreamHttpError` (classe tipada em `proxy.ts`)
-2. **Re-autentica** nos dominios restantes (excluindo os ja bloqueados)
+2. **Re-autentica** em ordem aleatoria nos dominios restantes (excluindo os ja bloqueados)
 3. **Atualiza** `session.server` com o novo dominio (mesmo token UUID)
 4. **Repete** a chamada original uma unica vez
 
@@ -224,7 +225,7 @@ demais aguardam a mesma Promise.
 - `iptv/proxy.ts` — `UpstreamHttpError` class (401/403 tipados)
 - `iptv/reauth.ts` — `reauthenticateSession()` com deduplicacao
 - `iptv/withFallback.ts` — `withUpstreamFallback()` wrapper
-- `iptv/auth.ts` — `authenticate()` com param `excludeBaseUrls`
+- `iptv/auth.ts` — `authenticate()` com ordem aleatoria e param `excludeBaseUrls`
 - `session/store.ts` — `blockedServers` Set + `updateSessionServer()`
 - `routes/stream.ts` — handlers envoltos com `withUpstreamFallback()`
 
@@ -318,6 +319,10 @@ cd frontend && npm run build
 
 # Rebuild backend
 cd backend && npm run build
+
+# Validacoes backend
+cd backend && npm run typecheck
+cd backend && npm run lint
 
 # Build completo (frontend + backend)
 cd frontend && npm run build && cd ../backend && npm run build && pm2 restart nova-backend

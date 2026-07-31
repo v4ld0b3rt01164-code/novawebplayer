@@ -9,8 +9,18 @@ const movieRoutes = async (app) => {
     });
     app.get('/streams', async (req) => {
         const { category_id } = req.query;
-        const streams = await catalog.getVodStreams(req.session, category_id);
-        return { streams };
+        if (category_id) {
+            const streams = await catalog.getVodStreams(req.session, category_id);
+            return { streams };
+        }
+        const categories = await catalog.getVodCategories(req.session);
+        const allStreams = [];
+        const results = await Promise.allSettled(categories.map((c) => catalog.getVodStreams(req.session, c.category_id)));
+        for (const r of results) {
+            if (r.status === 'fulfilled')
+                allStreams.push(...r.value);
+        }
+        return { streams: allStreams };
     });
     app.get('/:vod_id', async (req) => {
         const { vod_id } = req.params;

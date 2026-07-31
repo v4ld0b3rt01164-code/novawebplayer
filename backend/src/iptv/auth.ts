@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import {
   IPTV_CANDIDATES,
 } from './servers.js'
@@ -11,6 +12,14 @@ export interface ActiveServer {
 
 const AUTH_TIMEOUT_MS = 5000
 const PLAYER_API_PATH = '/player_api.php'
+
+function shuffle<T>(items: T[]): T[] {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInt(index + 1)
+    ;[items[index], items[swapIndex]] = [items[swapIndex], items[index]]
+  }
+  return items
+}
 
 /**
  * Tenta autenticar em um único domínio Xtream Codes.
@@ -59,7 +68,7 @@ async function tryAuthenticate(
 }
 
 /**
- * Percorre a lista de domínios candidatos até um autenticar com sucesso.
+ * Embaralha e percorre os domínios candidatos até um autenticar com sucesso.
  *
  * @param excludeBaseUrls domínios a pular (ex: sabidamente bloqueados nesta
  * sessão). Usado pelo fallback em nível de stream; login normal não passa nada.
@@ -71,7 +80,9 @@ export async function authenticate(
   password: string,
   excludeBaseUrls: ReadonlySet<string> = new Set(),
 ): Promise<{ response: XtreamAuthResponse; server: ActiveServer }> {
-  const candidates = IPTV_CANDIDATES.filter((baseUrl) => !excludeBaseUrls.has(baseUrl))
+  const candidates = shuffle(
+    IPTV_CANDIDATES.filter((baseUrl) => !excludeBaseUrls.has(baseUrl)),
+  )
 
   if (candidates.length === 0) {
     throw new Error('Todos os servidores candidatos estão bloqueados nesta sessão.')

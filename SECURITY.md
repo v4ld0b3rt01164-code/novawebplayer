@@ -1,9 +1,7 @@
 # SECURITY.md — NOVA Web Player
 
 Documento de seguranca do projeto. Criado em: 2026-07-17.
-Ultima atualizacao: 2026-07-19 (achados 1-4 implementados + achados 7-8:
-path traversal corrigido e rate limiting implementado + achado 6:
-sessoes persistidas em disco).
+Ultima atualizacao: 2026-07-31 (ordem aleatoria de autenticacao documentada).
 Baseado em auditoria completa do codigo-fonte (frontend + backend).
 
 ---
@@ -257,6 +255,33 @@ IPTV upstream usando o proprio servidor como proxy.
 **Validacao**: 6 logins errados seguidos → 5x 401, 6a requisicao → 429.
 
 **Status**: ✅ Implementado e validado.
+
+---
+
+### 9. Ordem aleatoria dos servidores de autenticacao — IMPLEMENTADO
+
+**Tipo**: comportamento de resiliencia
+**Arquivos**: `backend/src/iptv/auth.ts`, `backend/src/iptv/servers.ts`
+**Data da implementacao**: 2026-07-31
+
+**Comportamento**: a cada chamada de `authenticate()`, o backend cria uma
+copia dos candidatos, remove os dominios bloqueados da sessao e embaralha o
+resultado com Fisher-Yates usando `crypto.randomInt`. O primeiro dominio que
+responder HTTP 200 com `user_info.auth === 1` se torna o servidor ativo.
+
+**Fallback**: se o dominio sorteado falhar, os demais sao tentados na mesma
+ordem aleatoria. A reautenticacao automatica de streams usa a mesma funcao e
+continua respeitando `blockedServers`.
+
+**Seguranca**: a lista de dominios continua somente no backend. A
+randomizacao nao altera o transporte das credenciais, os tokens de sessao ou
+as mensagens de erro.
+
+**Validacao**: `npm run typecheck` e `npm run build` aprovados; `npm run lint`
+aprovado com aviso preexistente de import nao utilizado em
+`backend/src/routes/transcode.ts`.
+
+**Status**: Implementado e validado.
 
 ---
 

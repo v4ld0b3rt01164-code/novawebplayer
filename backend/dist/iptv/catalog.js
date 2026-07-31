@@ -39,9 +39,10 @@ export async function getLiveCategories(session) {
     return xtreamFetch(session, 'get_live_categories');
 }
 export async function getLiveStreams(session, categoryId) {
-    return xtreamFetch(session, 'get_live_streams', {
-        category_id: categoryId,
-    });
+    const extra = {};
+    if (categoryId)
+        extra.category_id = categoryId;
+    return xtreamFetch(session, 'get_live_streams', extra);
 }
 export async function getShortEpg(session, streamId, limit = 4) {
     return xtreamFetch(session, 'get_short_epg', {

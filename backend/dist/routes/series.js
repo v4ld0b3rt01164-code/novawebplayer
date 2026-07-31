@@ -9,8 +9,18 @@ const seriesRoutes = async (app) => {
     });
     app.get('/', async (req) => {
         const { category_id } = req.query;
-        const series = await catalog.getSeries(req.session, category_id);
-        return { series };
+        if (category_id) {
+            const series = await catalog.getSeries(req.session, category_id);
+            return { series };
+        }
+        const categories = await catalog.getSeriesCategories(req.session);
+        const allSeries = [];
+        const results = await Promise.allSettled(categories.map((c) => catalog.getSeries(req.session, c.category_id)));
+        for (const r of results) {
+            if (r.status === 'fulfilled')
+                allSeries.push(...r.value);
+        }
+        return { series: allSeries };
     });
     app.get('/:series_id', async (req) => {
         const { series_id } = req.params;

@@ -9,10 +9,11 @@ const liveRoutes = async (app) => {
     });
     app.get('/streams', async (req) => {
         const { category_id } = req.query;
-        if (!category_id) {
-            return { error: 'category_id é obrigatório' };
+        if (category_id) {
+            const streams = await catalog.getLiveStreams(req.session, category_id);
+            return { streams };
         }
-        const streams = await catalog.getLiveStreams(req.session, category_id);
+        const streams = await catalog.getLiveStreams(req.session);
         return { streams };
     });
     app.get('/short_epg/:stream_id', async (req) => {

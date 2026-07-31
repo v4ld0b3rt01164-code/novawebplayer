@@ -5,7 +5,7 @@ export interface ActiveServer {
     password: string;
 }
 /**
- * Percorre a lista de domínios candidatos até um autenticar com sucesso.
+ * Embaralha e percorre os domínios candidatos até um autenticar com sucesso.
  *
  * @param excludeBaseUrls domínios a pular (ex: sabidamente bloqueados nesta
  * sessão). Usado pelo fallback em nível de stream; login normal não passa nada.

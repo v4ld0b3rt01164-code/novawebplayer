@@ -1,7 +1,8 @@
 # STATUS — NOVA Web Player
 
-Documento vivo do estado atual do projeto. Atualizado em: 2026-07-29
-(Favoritos: categoria dentro de Live, Movies e Series com persistencia localStorage).
+Documento vivo do estado atual do projeto. Atualizado em: 2026-07-31
+(Login: ordem aleatoria segura entre os 8 dominios a cada autenticacao;
+Favoritos: categoria dentro de Live, Movies e Series com persistencia localStorage).
 **Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
 
 ---
@@ -37,7 +38,7 @@ isolados no backend.
 | Metodo | Rota | Auth | Descricao |
 |--------|------|------|-----------|
 | GET    | `/api/health` | nao | healthcheck |
-| POST   | `/api/auth` | nao | login com `{ username, password }` (fallback entre 8 dominios; rate limit 5 req/min por IP) |
+| POST   | `/api/auth` | nao | login com `{ username, password }` (ordem aleatoria + fallback entre 8 dominios; rate limit 5 req/min por IP) |
 | GET    | `/api/live/categories` | sim | categorias de TV ao vivo |
 | GET    | `/api/live/streams?category_id=` | sim | canais da categoria (category_id opcional — sem ele, retorna todos) |
 | GET    | `/api/live/short_epg/:stream_id` | sim | EPG curto |
@@ -97,10 +98,11 @@ para buscar segmentos.
 
 ### Login
 1. `POST /api/auth` com `{ username, password }`.
-2. Backend tenta os 8 dominios em ordem, com timeout 5s. Sucesso = `user_info.auth === 1`.
+2. Backend embaralha os 8 dominios com `crypto.randomInt` e tenta a nova ordem, com timeout 5s. Sucesso = `user_info.auth === 1`.
 3. Token UUID guardado **apenas em memoria** (Context). Nenhum localStorage/sessionStorage.
 4. Proximas chamadas enviam `Authorization: Bearer <token>`.
 5. Erro 401 com mensagem generica (sem expor credenciais).
+6. Se um stream retornar 401/403, a reautenticacao repete o processo entre os dominios ainda disponiveis.
 
 ### Menu
 - 3 botoes com SVGs sem moldura (sem bg, ring, shadow, rounded).
@@ -176,6 +178,7 @@ para buscar segmentos.
 ## 6. Seguranca
 
 - Dominios IPTV **so no backend** (`backend/src/iptv/servers.ts`).
+- A ordem dos dominios e embaralhada no backend com `crypto.randomInt`; isso nao expoe a lista ao frontend.
 - Credenciais **nunca** vao para o frontend. So trafegam em `POST /api/auth`.
 - Backend associa o servidor ativo ao token UUID em memoria (TTL 24h).
 - `localStorage` usado **apenas** para favoritos (IDs de itens, nao dados sensiveis).
@@ -268,6 +271,7 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **Fallback transcode: tsc -b --noEmit + build OK; validado em iPhone (usuario real) — 2026-07-29**
 - **Sessao persistida em disco (sessions.json): OK**
 - **VOD iPhone (filmes + series): OK — iOS WebKit redirect para /transcode validado por usuario iPhone**
+- **Login com ordem aleatoria entre 8 dominios: typecheck/build OK; lint OK com aviso preexistente**
 
 ---
 
