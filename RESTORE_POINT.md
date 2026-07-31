@@ -1,8 +1,8 @@
 # RESTORE POINT — NOVA WEB PLAYER
 
-**Data**: 2026-07-30 (atualizado - randomizacao servidores + proxy imagens + logs legiveis + hls.js forcado no Chrome)
+**Data**: 2026-07-30 (atualizado - randomizacao servidores + proxy imagens + logs legiveis + hls.js forcado no Chrome + auditoria de documentacao)
 **Status**: FUNCIONANDO (desktop + mobile, live + VOD + series + fallback stream + fallback transcode + Favoritos + randomizacao + proxy imagens + Chrome AC3/EAC3 via hls.js)
-**Checkpoint git**: ultimo commit: `0d25c7a` (fix: Live favoritos) — pendente novo checkpoint apos validacao
+**Checkpoint git**: tag `checkpoint-2026-07-30` (criada em 2026-07-30 após 6 commits + 1 commit de auditoria docs)
 **Nota conhecida**: Botao maximizar series mobile so rotaciona a tela (nao vai fullscreen nativo).
 
 ---
@@ -39,8 +39,8 @@ scripts\windows\restart.bat
 
 | Tag | Estado |
 |---|---|
+| `checkpoint-2026-07-30` | randomizacao Fisher-Yates + proxy imagens /api/img + logs legiveis isolados + hls.js forcado no Chrome (resolve AC3/EAC3) + scripts Windows sem janelas + auditoria/correcao de documentacao |
 | `0d25c7a` | Favoritos em Live, Movies e Series — singleton compartilhado + endpoints com category_id opcional |
-| _pendente_ | 2026-07-30: randomizacao Fisher-Yates + proxy imagens /api/img + logs legiveis + scripts sem janelas |
 | `checkpoint-2026-07-18` | player fixo no topo SeriesScreen desktop (fixed inset-0 z-50) + useIsDesktopViewport evita 2 VideoPlayers |
 | `checkpoint-2026-07-17-transcode-fallback` | + fallback automatico /stream -> /transcode no player (iOS AC3/EAC3 + heuristica "toca mudo") |
 | `checkpoint-2026-07-17` | seguranca: path traversal corrigido + rate limiting + trustProxy |
@@ -160,10 +160,18 @@ NOVAWEBPLAYER/
 │   │   ├── features/
 │   │   │   ├── auth/LoginScreen.tsx
 │   │   │   ├── menu/MenuScreen.tsx
+│   │   │   ├── favorites/              # useFavorites, FavoriteButton, FavoritesScreen
+│   │   │   │   ├── useFavorites.ts
+│   │   │   │   ├── FavoriteButton.tsx
+│   │   │   │   ├── FavoritesScreen.tsx
+│   │   │   │   └── index.ts
 │   │   │   ├── live/LiveScreen.tsx     # Auto-play + fixed split
+│   │   │   ├── live/epg.ts             # Helpers EPG (findNowNext, formatTime, getChannelEpg)
 │   │   │   ├── movies/MoviesScreen.tsx
 │   │   │   └── series/SeriesScreen.tsx # renderMode poster/episodes/all + fixed split
-│   │   └── shared/                     # Header, Loading, ErrorState
+│   │   ├── shared/                     # Header, Loading, ErrorState, SectionTitle, Button
+│   │   └── types/                      # index.ts (espelha backend) + errors.ts
+│   ├── public/                         # favicon + SVGs do menu + favoritos.svg
 │   ├── dist/                           # Build do frontend
 │   └── scripts/
 │       └── strip-crossorigin.cjs       # Remove crossorigin do build

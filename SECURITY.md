@@ -292,9 +292,9 @@ Pendencia adicional conhecida: limite de processos ffmpeg concorrentes em
    fallback de stream re-embaralha os restantes. Nao ha "primario" fixo.
 9. **Logs do backend sao legiveis e isolados**: pino em nivel `error`
    (sem JSON de request/response); logs de negocio via `console.log`
-   (`[auth]`, `[stream]`, `[proxy]`, `[fallback]`, `[reauth]`) vao SO
-   para o console/`backend.log`, jamais para respostas HTTP ao usuario.
-   URLs upstream com credenciais sao mascaradas (`maskUrl`).
+   (`[auth]`, `[stream]`, `[proxy]`, `[fallback]`, `[reauth]`, `[transcode]`)
+   vao SO para o console/`backend.log`, jamais para respostas HTTP ao
+   usuario. URLs upstream com credenciais sao mascaradas (`maskUrl`).
 10. **Imagens do catalogo sao proxiadas** pelo backend (`GET /api/img?u=...`);
     o frontend nunca carrega `http://*` direto (evita Mixed Content e nao
     expoe dominios IPTV no HTML do site).

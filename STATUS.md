@@ -143,7 +143,7 @@ para buscar segmentos.
 - Ao clicar, filtra e mostra apenas itens marcados com coracao.
 - **Singleton**: `useFavorites` usa variavel modulo compartilhada (`cached`) + listeners para sincronizar todos os componentes instantaneamente.
 - **Backend**: endpoints de streams aceitam `category_id` opcional. Sem category_id, busca todos os streams via Xtream API direto (sem duplicar requests por categoria).
-- **Arquivos**: `useFavorites.ts` (hook), `FavoriteButton.tsx` (botao), `FavoritesScreen.tsx` (tela预留, nao usada no menu), `index.ts` (exports).
+- **Arquivos**: `useFavorites.ts` (hook), `FavoriteButton.tsx` (botao), `FavoritesScreen.tsx` (tela reservada, nao usada no menu), `index.ts` (exports).
 
 ### TV AO VIVO
 - Categorias -> Canais -> Player.
@@ -222,8 +222,8 @@ para buscar segmentos.
 - Erros de login nao mencionam senha ou dominio.
 - **Logs do backend sao legiveis e isolados**: pino silenciado
   (`logger.level: 'error'`); logs de negocio via `console.log` legiveis
-  (`[auth]`, `[stream]`, `[proxy]`, `[fallback]`, `[reauth]`) vao SO
-  para o console do backend e `backend.log`, jamais para o usuario
+  (`[auth]`, `[stream]`, `[proxy]`, `[fallback]`, `[reauth]`, `[transcode]`)
+  vao SO para o console do backend e `backend.log`, jamais para o usuario
   final. URLs upstream com credenciais sao mascaradas (`maskUrl`).
 - **Static serving via @fastify/static** (root fixo em `frontend/dist`;
   path traversal com `..` retorna 403). Nenhum caminho de arquivo e
@@ -370,3 +370,41 @@ taskbar ao iniciar/reiniciar. Processos rodam totalmente ocultos.
 - [x] ~~Transcodicao on-the-fly (ffmpeg -> HLS H.264/AAC) para HEVC/AC3~~ (implementado: fallback automatico no player + iOS WebKit redirect)
 - [x] ~~VOD iPhone (filmes/series) — iOS WebKit redirect para /transcode~~ (validado por usuario iPhone 2026-07-29)
 - [ ] Limite de processos ffmpeg concorrentes (iptv/transcode.ts)
+
+---
+
+## 11. Auditoria de documentacao (2026-07-30)
+
+Em 2026-07-30 foi feita uma varredura completa dos `.md` do projeto
+(`STATUS.md`, `AGENTS.md`, `PRD.md`, `DESIGN.md`, `RESTORE_POINT.md`,
+`SECURITY.md`, `SCRIPTS.md`, `scripts/windows/README.md`,
+`frontend/README.md`) contra o codigo-fonte real. Foram identificadas
+**20 inconsistencias** (info errada, info faltando, lixo de encoding,
+referencia a codigo morto). Todas foram corrigidas em um unico commit
+dedicado. Resumo:
+
+| # | Arquivo | Tipo | Correcao |
+|---|---|---|---|
+| 1 | `DESIGN.md` §5.5 | info errada | Secao reescrita — backend agora proxia imagens via `/api/img` (nao "nada" como dizia antes) |
+| 2 | `scripts/windows/README.md` L75 | nome errado | `pm2 logs nova-web-player` → `pm2 logs nova-backend` |
+| 3 | `RESTORE_POINT.md` §header | desatualizado | "ultimo commit" agora reflete os 6 commits do dia |
+| 4 | `RESTORE_POINT.md` L43 | pendente → feito | Tabela de checkpoints substituiu "_pendente_" pela tag `checkpoint-2026-07-30` |
+| 5 | `PRD.md` L60, L87 | info errada | "lista ordenada" / "ordem definida" → Fisher-Yates aleatorio |
+| 6 | `STATUS.md` L146 | lixo encoding | "tela预留" → "tela reservada" |
+| 7 | `AGENTS.md` L186 | info errada | "git local sem remote" → menciona `github.com/v4ld0b3rt01164-code/novawebplayer.git` |
+| 8 | `AGENTS.md` §Estrutura | incompleto | +16 arquivos reais (backend: categoryOrder, codec, transcode, types, img route, etc; frontend: menu, favorites, types, api) |
+| 9 | `AGENTS.md` L44 | codigo morto | `HlsPlayer.tsx` e `Mp4Player.tsx` removidos do projeto (0 importacoes); unificado em `VideoPlayer.tsx` |
+| 10 | `AGENTS.md` §Stack L11-13 | ambiguo | Reformulado para alinhar com a logica real do `VideoPlayer.tsx` (hls.js em nao-Safari/iOS) |
+| 11 | `AGENTS.md` L19-20 | info errada | "Express ou Fastify" → "Fastify 5" (Express nunca foi usado) |
+| 12 | `SCRIPTS.md` §Estrutura | incompleto | Adicionado `periodic-restart.ps1` na lista |
+| 13 | `scripts/windows/README.md` L52-58 | incompleto | Explicacao completa de `periodic-restart.ps1` (8h, smart restart do tunnel) |
+| 14 | `RESTORE_POINT.md` §Estrutura | incompleto | Adicionada pasta `features/favorites/` na arvore |
+| 15 | `STATUS.md` L222 + `SECURITY.md` L293-296 | tag de log faltando | `[transcode]` adicionado a lista (existe em `iptv/transcode.ts:155-187`) |
+| 16 | `AGENTS.md` L64 | incompleto | Rotas agora mencionam `/transcode/*` e `/api/img` alem de `/api/*` e `/stream/*` |
+| 17 | `frontend/README.md` | template padrao | Substituido por conteudo real do projeto (comandos, estrutura, decisoes) |
+| 18 | `PROMPT.md` | — | Mantido como historico (kickoff inicial) |
+| 19 | `RESTORE_POINT.md` L308-309 | conta descartavel | Mantido (confirmado pelo autor — conta de teste) |
+| 20 | `DESIGN.md` §5.4 | incompleto | Adicionado `favoritos.svg` na lista de SVGs do menu |
+
+Alem disso, foi criada a tag **`checkpoint-2026-07-30`** marcando o
+estado estavel apos essas correcoes.

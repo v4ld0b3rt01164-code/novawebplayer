@@ -16,6 +16,7 @@ scripts/windows/
   install-startup.bat      # Instala auto-inicializacao
   uninstall-startup.bat    # Remove auto-inicializacao
   watchdog.ps1             # Monitor PowerShell (opcional)
+  periodic-restart.ps1     # Restart inteligente a cada 8h (tunnel so se backend healthy)
 ```
 
 ## Variaveis (config.bat)
@@ -50,9 +51,15 @@ Checklist de saude:
 - Health check HTTP (curl)
 
 ### install-startup.bat
-Cria duas tarefas no Task Scheduler do Windows:
+Cria tres tarefas no Task Scheduler do Windows:
 - **NOVA Start**: roda `start-hidden.bat` no logon do usuario
 - **NOVA Watchdog**: roda `watchdog.ps1` a cada 2 minutos
+- **NOVA Periodic Restart**: roda `periodic-restart.ps1` a cada 8 horas.
+  Reset preventivo: se o backend estiver healthy, reinicia apenas o
+  tunnel (sessoes em memoria preservadas). Se unhealthy, reinicia tudo
+  (sessoes sobrevivem em disco via `backend/sessions.json`). Nao
+  substitui o watchdog (que detecta quedas imediatas) — apenas
+  evita estados inconsistentes acumulados do tunnel.
 
 ### uninstall-startup.bat
 Remove as tarefas do Task Scheduler.
