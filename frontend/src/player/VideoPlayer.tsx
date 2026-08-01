@@ -7,10 +7,8 @@ interface VideoPlayerProps {
   poster?: string
   /**
    * URL alternativa via /transcode/... (ffmpeg -> H.264/AAC).
-   * Tentada automaticamente UMA vez quando o navegador reporta erro
-   * real de reprodução na src principal (codec/formato não suportado,
-   * ex.: áudio AC3/EAC3 no iOS). A src principal continua sendo sempre
-   * a primeira tentativa.
+   * Em VOD mobile ela é usada preventivamente; nos demais navegadores é
+   * tentada UMA vez quando a fonte principal reporta erro real de reprodução.
    */
   fallbackSrc?: string
 }
@@ -21,6 +19,11 @@ interface VideoPlayerProps {
 // (descarte silencioso de faixas AC3/EAC3) existe.
 interface WebKitVideoElement extends HTMLVideoElement {
   webkitAudioDecodedByteCount?: number
+}
+
+function isMobileBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
 export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProps) {
@@ -78,19 +81,26 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
 
     // iOS Safari não suporta MSE (hls.js) e frequentemente não consegue
     // decodificar VOD não-HLS (MP4/MKV com codecs incompatíveis).
-    // Redireciona para o pipeline de transcode H.264/AAC imediatamente.
+    // Android também pode rejeitar o MP4 do painel por codec/container ou
+    // por uma resposta Range incompatível. Em VOD mobile, usa o pipeline
+    // normalizado H.264/AAC imediatamente; Live continua HLS.
     const isIOSWebKit =
       !Hls.isSupported() &&
       typeof document !== 'undefined' &&
       !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl')
 
-    if (isIOSWebKit && fallbackSrc) {
-      const cp = url.split('?')[0]
-      if (!cp.endsWith('.m3u8') && !cp.startsWith('/transcode/')) {
-        url = fallbackSrc
-        activeSrcRef.current = fallbackSrc
-        triedFallbackRef.current = true
-      }
+    const sourcePath = url.split('?')[0]
+    const sourceIsHls = sourcePath.endsWith('.m3u8')
+    const preferMobileVod =
+      !!fallbackSrc &&
+      !sourceIsHls &&
+      !sourcePath.startsWith('/transcode/') &&
+      (isIOSWebKit || isMobileBrowser())
+
+    if (preferMobileVod && fallbackSrc) {
+      url = fallbackSrc
+      activeSrcRef.current = fallbackSrc
+      triedFallbackRef.current = true
     }
 
     const playVideo = () => {
@@ -124,12 +134,14 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
 
     if (!isHls) {
       video.src = url
+      video.load()
       playVideo()
       return
     }
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = url
+      video.load()
       playVideo()
     } else if (Hls.isSupported()) {
       const hls = new Hls({
@@ -182,6 +194,7 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
       video.play().catch(() => {})
     } else {
       video.src = url
+      video.load()
       playVideo()
     }
   }, [src, destroyHls, clearAudioProbe, tryFallback, fallbackSrc])

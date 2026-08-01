@@ -182,14 +182,16 @@ para buscar segmentos.
 
 ### Correcao de compatibilidade VOD mobile (2026-07-31)
 
+- Android e iOS agora usam preventivamente o endpoint `/transcode` para VOD e
+  series, entregando MP4 H.264/AAC normalizado. Live continua usando a fonte
+  HLS direta/fallback.
 - Causa identificada: o fallback antigo convertia Filmes/Séries para HLS. O
   Safari apresentava a etiqueta "Transmissao ao Vivo" mesmo sendo VOD.
 - Correcao: somente Live usa HLS. Filmes e Séries usam MP4 progressivo
   transcodificado em H.264/AAC, com `yuv420p`, `faststart` e `Range`.
-- Android/desktop mantêm a fonte direta como primeira tentativa; o fallback e
-  acionado por `NotSupportedError` ou erro de mídia. No WebKit/iPhone, o VOD
-  usa o MP4 transcodificado preventivamente porque alguns codecs falham sem
-  emitir erro confiavel; nunca e convertido para HLS.
+- Desktop mantém a fonte direta como primeira tentativa. Android/iPhone usam o
+  MP4 transcodificado preventivamente porque alguns codecs e respostas Range
+  falham em browsers moveis; nunca sao convertidos para HLS.
 - Arquivos principais: `frontend/src/player/VideoPlayer.tsx`,
   `frontend/src/api/streamUrl.ts`, `backend/src/iptv/transcode.ts` e
   `backend/src/routes/transcode.ts`.
@@ -199,6 +201,9 @@ para buscar segmentos.
   porque o FFmpeg encerrou antes de produzir o MP4; o erro detalhado estava
   sendo descartado. A rotina agora envia `User-Agent`/`Accept` compatíveis,
   registra somente a mensagem sanitizada e nao expoe token ou credencial.
+- Falhas upstream `502/503/504` agora acionam reautenticacao e troca de
+  dominio, assim como `401/403`. O VOD e sondado antes do FFmpeg para impedir
+  que paginas de erro sejam tratadas como MP4.
 - Corrigido tambem o cleanup ESM do transcode: removido uso de `require()` que
   derrubava o backend quando um transcode ocioso era limpo.
 - Validacao em dispositivo real: pendente após reinício do backend, cobrindo

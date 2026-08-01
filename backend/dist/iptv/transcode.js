@@ -16,6 +16,7 @@ import { createReadStream, existsSync, mkdirSync, rmSync, statSync, unlinkSync, 
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { UpstreamHttpError } from './proxy.js';
 const TMP_BASE = path.join(os.tmpdir(), 'novawebplayer-transcode');
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
 const IDLE_TIMEOUT_MS = 300_000; // 5 min sem acesso = encerrar
@@ -24,6 +25,37 @@ function buildUpstreamUrl(session, type, file) {
     const { baseUrl, username, password } = session.server;
     const basePath = type === 'live' ? 'live' : type;
     return `${baseUrl}/${basePath}/${username}/${password}/${file}`;
+}
+/**
+ * Confirma que o painel respondeu um VOD real antes de iniciar o FFmpeg.
+ * Alguns domínios respondem 503 com uma página de erro; se isso for entregue
+ * ao FFmpeg, o sintoma vira apenas "moov atom not found".
+ */
+export async function probeVodSource(session, type, file) {
+    const url = buildUpstreamUrl(session, type, file);
+    let res;
+    try {
+        res = await fetch(url, {
+            headers: {
+                Accept: '*/*',
+                Range: 'bytes=0-1',
+                'User-Agent': 'NovaWebPlayer/1.0',
+            },
+            signal: AbortSignal.timeout(15_000),
+        });
+    }
+    catch {
+        throw new Error('Falha de rede ao consultar o VOD upstream.');
+    }
+    if (!res.ok) {
+        await res.body?.cancel();
+        throw new UpstreamHttpError(res.status, `Upstream retornou ${res.status} para VOD`);
+    }
+    const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+    await res.body?.cancel();
+    if (contentType.includes('text/html') || contentType.includes('application/json')) {
+        throw new UpstreamHttpError(502, 'Upstream respondeu conteúdo que não é vídeo.');
+    }
 }
 function key(session, type, file) {
     return `${session.token}::${type}::${file}`;

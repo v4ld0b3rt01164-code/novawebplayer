@@ -90,7 +90,7 @@ commitado corresponder ao codigo-fonte.
 
 - [x] Login com ordem aleatoria e fallback entre 8 dominios IPTV (`crypto.randomInt` + Fisher-Yates)
 - [x] Monitor local de sessoes em `monitor-server.bat` (somente `server.baseUrl`, sem credenciais)
-- [x] **Fallback em tempo real durante streaming** (re-autenticacao automatica em 401/403)
+- [x] **Fallback em tempo real durante streaming** (re-autenticacao automatica em 401/403/502/503/504)
 - [x] TV ao vivo (HLS via proxy com descoberta de servidor real)
 - [x] **Auto-play primeiro canal ao entrar na pasta** (miniplayer ja inicia reproduzindo)
 - [x] **Layout split fixo TV ao vivo** (player + EPG travados, coluna canais rola com scrollbar propria)
@@ -113,8 +113,8 @@ commitado corresponder ao codigo-fonte.
 - [x] **Rate limiting** (300 req/min global + 5 req/min em POST /api/auth, por IP real via trustProxy)
 - [x] **index.html sempre no-store** (hook onSend forca em text/html; assets com hash mantem cache 30d)
 - [x] **Fallback automatico para transcode** (Live -> HLS; Filmes/Séries -> MP4 H.264/AAC progressivo; erro de codec, `NotSupportedError` ou "toca mudo" no iOS/WebKit)
-- [x] **Fallback mobile VOD** (rejeicao `NotSupportedError` de `video.play()` capturada; listener registrado antes da primeira carga; MIME `.mp4` normalizado no proxy)
-- [x] **Diagnostico e robustez do transcode** (FFmpeg recebe `User-Agent`/`Accept`; stderr sanitizado; cleanup ESM sem `require()`)
+- [x] **Fallback mobile VOD** (Android/iOS usam MP4 H.264/AAC preventivamente; rejeicao `NotSupportedError` e listener de erro continuam cobertos; MIME `.mp4` normalizado no proxy)
+- [x] **Diagnostico e robustez do transcode** (sonda VOD antes do FFmpeg; troca de dominio em 502/503/504; headers compatíveis; stderr sanitizado; cleanup ESM sem `require()`)
 - [x] **Sessao persistida em disco** (sessions.json com debounced write, sobrevive a restarts do backend)
 
 ---

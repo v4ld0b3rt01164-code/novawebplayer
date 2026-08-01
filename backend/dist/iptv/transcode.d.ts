@@ -13,6 +13,12 @@
  */
 import type { Session } from '../session/store.js';
 /**
+ * Confirma que o painel respondeu um VOD real antes de iniciar o FFmpeg.
+ * Alguns domínios respondem 503 com uma página de erro; se isso for entregue
+ * ao FFmpeg, o sintoma vira apenas "moov atom not found".
+ */
+export declare function probeVodSource(session: Session, type: 'movie' | 'series', file: string): Promise<void>;
+/**
  * Inicia (ou reutiliza) o pipeline ffmpeg para o stream.
  * Retorna o diretório onde o resultado transcodificado é gerado.
  */

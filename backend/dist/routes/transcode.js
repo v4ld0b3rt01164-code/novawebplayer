@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { requireStreamAuth } from './streamAuth.js';
-import { getDir, playlistPath, readSegmentStream, segmentPath, segmentStat, startTranscode, touch, vodStat, readVodStream, waitForVodTranscode, waitForFirstSeg, } from '../iptv/transcode.js';
+import { getDir, playlistPath, readSegmentStream, segmentPath, segmentStat, startTranscode, touch, vodStat, readVodStream, probeVodSource, waitForVodTranscode, waitForFirstSeg, } from '../iptv/transcode.js';
+import { withUpstreamFallback } from '../iptv/withFallback.js';
 function parseByteRange(header, size) {
     if (!header)
         return null;
@@ -40,7 +41,10 @@ const transcodeRoutes = async (app) => {
         }
         const session = req.session;
         if (type === 'movie' || type === 'series') {
-            const dir = await startTranscode(session, type, file);
+            const dir = await withUpstreamFallback(session, async () => {
+                await probeVodSource(session, type, file);
+                return startTranscode(session, type, file);
+            });
             const ready = await waitForVodTranscode(session, type, file);
             if (!ready) {
                 return reply.status(504).send({

@@ -1,9 +1,9 @@
 import type { Session } from '../session/store.js';
 /**
- * Executa `operation()`. Se ela falhar com UpstreamHttpError 401/403,
- * re-autentica a sessão (trocando de domínio) e tenta `operation()` mais uma
- * única vez. Qualquer outro erro (rede, timeout, 5xx) propaga direto, sem
- * fallback — trocar de servidor não ajuda nesses casos.
+ * Executa `operation()`. Se ela falhar com UpstreamHttpError 401/403 ou com
+ * indisponibilidade HTTP 502/503/504, re-autentica a sessão (trocando de
+ * domínio) e tenta `operation()` mais uma única vez. Erros de rede e timeout
+ * continuam propagando direto.
  *
  * IMPORTANTE: `operation` deve ler `session.server` no momento em que é
  * chamada (não capturar a URL upstream antes de invocar este helper), para

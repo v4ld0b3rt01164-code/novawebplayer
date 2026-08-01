@@ -12,9 +12,11 @@ import {
   touch,
   vodStat,
   readVodStream,
+  probeVodSource,
   waitForVodTranscode,
   waitForFirstSeg,
 } from '../iptv/transcode.js'
+import { withUpstreamFallback } from '../iptv/withFallback.js'
 
 type ByteRange = { start: number; end: number }
 type ByteRangeResult = ByteRange | 'invalid' | null
@@ -64,7 +66,10 @@ const transcodeRoutes: FastifyPluginAsync = async (
     const session = req.session!
 
     if (type === 'movie' || type === 'series') {
-      const dir = await startTranscode(session, type, file)
+      const dir = await withUpstreamFallback(session, async () => {
+        await probeVodSource(session, type, file)
+        return startTranscode(session, type, file)
+      })
       const ready = await waitForVodTranscode(session, type, file)
       if (!ready) {
         return reply.status(504).send({
