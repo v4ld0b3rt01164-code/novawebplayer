@@ -1,14 +1,6 @@
-import { randomInt } from 'node:crypto';
 import { IPTV_CANDIDATES, } from './servers.js';
 const AUTH_TIMEOUT_MS = 5000;
 const PLAYER_API_PATH = '/player_api.php';
-function shuffle(items) {
-    for (let index = items.length - 1; index > 0; index -= 1) {
-        const swapIndex = randomInt(index + 1);
-        [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
-    }
-    return items;
-}
 /**
  * Tenta autenticar em um único domínio Xtream Codes.
  *
@@ -47,7 +39,23 @@ async function tryAuthenticate(baseUrl, username, password) {
     return null;
 }
 /**
- * Embaralha e percorre os domínios candidatos até um autenticar com sucesso.
+ * Embaralha um array em-place (Fisher-Yates) e devolve a mesma referência.
+ * Garante ordem aleatória sem viés para a tentativa de login/fallback.
+ */
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+    return arr;
+}
+/**
+ * Percorre a lista de domínios candidatos (em ordem aleatória por chamada)
+ * até um autenticar com sucesso. A randomização faz com que cada login tente
+ * um servidor diferente primeiro, distribuindo carga e evitando travar sempre
+ * no mesmo domínio quando há instabilidade.
  *
  * @param excludeBaseUrls domínios a pular (ex: sabidamente bloqueados nesta
  * sessão). Usado pelo fallback em nível de stream; login normal não passa nada.

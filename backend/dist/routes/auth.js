@@ -18,6 +18,7 @@ const authRoutes = async (app) => {
         try {
             const { response, server } = await authenticate(username, password);
             const token = createSession(server);
+            console.log(`[auth] login OK — servidor ativo: ${new URL(server.baseUrl).host} (sessão ${token.slice(0, 8)}…)`);
             return reply.send({
                 token,
                 user_info: response.user_info,

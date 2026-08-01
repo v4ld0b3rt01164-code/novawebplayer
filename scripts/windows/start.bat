@@ -14,7 +14,7 @@ echo [1/3] Verificando backend...
 netstat -ano | findstr ":3001" | findstr "LISTENING" >nul 2>&1
 if errorlevel 1 (
     echo      Iniciando backend...
-    start "nova-backend" /b cmd /c "cd /d "%BACKEND_DIR%" && node dist/index.js"
+    powershell -NoProfile -Command "Start-Process -FilePath 'node' -ArgumentList 'dist/index.js' -WorkingDirectory '%BACKEND_DIR%' -WindowStyle Hidden"
     timeout /t 4 /nobreak >nul
     netstat -ano | findstr ":3001" | findstr "LISTENING" >nul 2>&1
     if errorlevel 1 (
@@ -31,7 +31,7 @@ echo [2/3] Verificando tunnel...
 tasklist | findstr "cloudflared" >nul 2>&1
 if errorlevel 1 (
     echo      Iniciando tunnel...
-    start "nova-tunnel" /b cmd /c "cloudflared tunnel run %TUNNEL_NAME%"
+    powershell -NoProfile -Command "Start-Process -FilePath 'cloudflared' -ArgumentList 'tunnel run %TUNNEL_NAME%' -WindowStyle Hidden"
     timeout /t 4 /nobreak >nul
     tasklist | findstr "cloudflared" >nul 2>&1
     if errorlevel 1 (

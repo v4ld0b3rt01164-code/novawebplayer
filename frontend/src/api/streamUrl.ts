@@ -35,8 +35,9 @@ export function seriesStreamUrl(
  * reprodução na URL /stream/... (ex.: áudio AC3/EAC3 no iOS, MP4 sem
  * faststart). Mesmo padrão de path e token das funções acima.
  *
- * LIVE retorna HLS H.264/AAC. MOVIES/SERIES retornam MP4 progressivo
- * H.264/AAC, preservando a semântica de VOD no Safari/iOS.
+ * IMPORTANTE: a rota /transcode/:type/:file responde SEMPRE uma playlist
+ * HLS (H.264/AAC), mesmo quando o arquivo pedido termina em .mp4/.mkv —
+ * o player trata qualquer URL /transcode/ como HLS.
  */
 
 export function liveTranscodeUrl(streamId: number, token: string): string {

@@ -1,5 +1,5 @@
 /**
- * Lista central de domínios candidatos para autenticação e fallback.
+ * Lista ordenada de domínios candidatos para fallback.
  *
  * REGRA (AGENTS.md / PRD): única fonte de verdade dos domínios; deve ficar
  * no backend e nunca ser exposta ao frontend.

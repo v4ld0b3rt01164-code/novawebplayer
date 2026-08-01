@@ -1,6 +1,4 @@
 import { requireStreamAuth } from './streamAuth.js';
-import { fetchRewrittenPlaylist, fetchUpstreamSegment, fetchUpstreamRaw, resolveSegmentUrl, buildUpstreamUrl, } from '../iptv/proxy.js';
-import { withUpstreamFallback } from '../iptv/withFallback.js';
 /** Mascarar senha em URL upstream para logs seguros. */
 function maskUrl(url) {
     try {
@@ -17,17 +15,8 @@ function maskUrl(url) {
         return url;
     }
 }
-function contentTypeForFile(file, upstreamContentType) {
-    const extension = file.split('?')[0].split('.').pop()?.toLowerCase();
-    // Some IPTV panels return application/octet-stream (or another generic
-    // type) for valid MP4 files. Mobile browsers are stricter when nosniff is
-    // enabled, so use the container's canonical MIME type at our boundary.
-    if (extension === 'mp4' || extension === 'm4v')
-        return 'video/mp4';
-    if (extension === 'webm')
-        return 'video/webm';
-    return upstreamContentType;
-}
+import { fetchRewrittenPlaylist, fetchUpstreamSegment, fetchUpstreamRaw, resolveSegmentUrl, buildUpstreamUrl, } from '../iptv/proxy.js';
+import { withUpstreamFallback } from '../iptv/withFallback.js';
 const streamRoutes = async (app) => {
     app.addHook('preHandler', requireStreamAuth);
     app.options('/:type/:file', async (_req, reply) => {
@@ -43,6 +32,7 @@ const streamRoutes = async (app) => {
         const ext = file.split('.').pop()?.toLowerCase() ?? '';
         if (ext === 'm3u8') {
             const origin = `${req.headers['x-forwarded-proto'] ?? req.protocol}://${req.headers.host}`;
+            console.log(`[stream] ${type}/${file} via ${new URL(session.server.baseUrl).host} (sessão ${session.token.slice(0, 8)}…)`);
             try {
                 const playlist = await withUpstreamFallback(session, () => fetchRewrittenPlaylist(session, type, file, origin, session.token));
                 reply.header('content-type', 'application/vnd.apple.mpegurl');
@@ -60,7 +50,7 @@ const streamRoutes = async (app) => {
                 const upstreamUrl = buildUpstreamUrl(session, type, file);
                 return fetchUpstreamRaw(upstreamUrl, rangeHeader);
             });
-            reply.header('content-type', contentTypeForFile(file, contentType));
+            reply.header('content-type', contentType);
             reply.header('accept-ranges', 'bytes');
             if (contentRange) {
                 reply.header('content-range', contentRange);

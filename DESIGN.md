@@ -474,7 +474,8 @@ frontend/public/
 ├── favicon.svg
 ├── tv-ao-vivo.svg        (300×300, gradiente vermelho)
 ├── filmes.svg            (300×300, gradiente azul)
-└── series-novelas.svg    (300×300, gradiente roxo)
+├── series-novelas.svg    (300×300, gradiente roxo)
+└── favoritos.svg         (300×300, gradiente rosa)  [Favoritos]
 ```
 
 Cada SVG tem `role="img"` e `aria-label`. O atributo `viewBox="0 0 300
@@ -484,11 +485,32 @@ cartões `aspect-square`.
 
 ### 5.5 Onde esses thumbs são cacheados
 
-- **Pelo navegador**: HTTP cache padrão baseado em `Cache-Control` do
-  servidor de imagens do painel. Em geral os logos/posters são
-  imutáveis por meses.
-- **Pelo nosso backend**: nada. Não fazemos proxy nem cache de
-  imagens. O navegador pega do painel direto.
+Os thumbs vindos do painel IPTV (logos de canais, capas de filmes, backdrops
+de séries, posters de episódios) **são proxiados pelo backend** desde
+2026-07-30. O motivo é o Mixed Content: o painel devolve URLs `http://` e
+o frontend roda em `https://novawebplayer.app` — o navegador bloqueia o
+carregamento misto.
+
+Fluxo:
+1. `catalog.ts` (`backend/src/iptv/catalog.ts`) reescreve cada URL de
+   imagem do JSON do painel (campos `stream_icon`, `cover`,
+   `backdrop_path[]`, `movie_image`) para `/api/img?u=<url encoded>` (URL
+   relativa → mesma origem HTTPS).
+2. A rota `GET /api/img` (`backend/src/routes/img.ts`) busca o binário
+   upstream via http/https, devolve via HTTPS com `Cache-Control:
+   public, max-age=86400` (24h). Sem auth — imagens de catálogo não
+   são sensíveis; rate-limit global protege contra abuso.
+3. O navegador faz cache local com base nesse `Cache-Control` por até
+   24h; o backend não mantém cache em memória para essas respostas.
+
+Campos reescritos: `stream_icon` (live + vod), `cover` (vod info +
+series), `backdrop_path[]` (series + series info), `movie_image`
+(episódios).
+
+**Não** passam pelo proxy (continuam via HTTP direto do painel, sem
+interferência): SVGs próprios em `frontend/public/` (favicon, ícones do
+menu, favoritos) — já são servidos pelo backend a partir de
+`frontend/dist` (mesma origem HTTPS).
 
 ---
 

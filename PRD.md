@@ -59,8 +59,9 @@ domínios dos painéis IPTV (`liderpremium.xyz` etc.)**. Em vez disso:
 
 ## 4. Domínios candidatos (fallback, agora resolvidos pelo backend)
 
-A aplicação deve manter uma lista central de domínios-base, embaralhar uma
-cópia dessa lista a cada autenticação e testar os domínios até obter sucesso:
+A aplicação deve manter uma lista de domínios-base (8 candidatos) e testar
+cada um em **ordem aleatória por chamada** (Fisher-Yates em
+`backend/src/iptv/auth.ts:shuffle`) até obter sucesso de autenticação.
 
 ```
 http://liderpremium.xyz/
@@ -84,8 +85,8 @@ http://aqphx.xyz/
 2. Frontend envia usuário/senha para o **próprio backend**
    (`https://novawebplayer.app/api/auth`), nunca diretamente para os
    domínios IPTV.
-3. **Backend** embaralha a lista de domínios candidatos e tenta cada um nessa
-   nova ordem, chamando internamente:
+3. **Backend** embaralha os 8 domínios candidatos (Fisher-Yates) e itera em
+   ordem aleatória, chamando internamente:
    ```
    {DOMINIO}/player_api.php?username={user}&password={pass}
    ```

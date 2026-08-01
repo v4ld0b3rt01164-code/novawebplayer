@@ -23,10 +23,8 @@ timeout /t 2 /nobreak >nul
 
 echo.
 echo [3/3] Iniciando servicos...
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$backend = $env:BACKEND_DIR; $stdout = Join-Path $backend 'backend.log'; $stderr = Join-Path $backend 'backend-error.log'; Start-Process -FilePath 'node.exe' -ArgumentList 'dist/index.js' -WorkingDirectory $backend -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr"
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$backend = $env:BACKEND_DIR; $stdout = Join-Path $backend 'cloudflared.log'; $stderr = Join-Path $backend 'cloudflared-error.log'; Start-Process -FilePath 'cloudflared.exe' -ArgumentList @('tunnel', 'run', $env:TUNNEL_NAME) -WorkingDirectory $backend -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr"
+powershell -NoProfile -Command "Start-Process -FilePath 'node' -ArgumentList 'dist/index.js' -WorkingDirectory '%BACKEND_DIR%' -WindowStyle Hidden"
+powershell -NoProfile -Command "Start-Process -FilePath 'cloudflared' -ArgumentList 'tunnel run %TUNNEL_NAME%' -WindowStyle Hidden"
 timeout /t 4 /nobreak >nul
 
 echo.

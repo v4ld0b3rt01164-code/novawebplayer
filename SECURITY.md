@@ -1,7 +1,8 @@
 # SECURITY.md — NOVA Web Player
 
 Documento de seguranca do projeto. Criado em: 2026-07-17.
-Ultima atualizacao: 2026-07-31 (ordem aleatoria de autenticacao documentada).
+Ultima atualizacao: 2026-07-30 (randomizacao de servidores + proxy de
+imagens do catalogo + logs legiveis isolation).
 Baseado em auditoria completa do codigo-fonte (frontend + backend).
 
 ---
@@ -258,63 +259,6 @@ IPTV upstream usando o proprio servidor como proxy.
 
 ---
 
-### 9. Ordem aleatoria dos servidores de autenticacao — IMPLEMENTADO
-
-**Tipo**: comportamento de resiliencia
-**Arquivos**: `backend/src/iptv/auth.ts`, `backend/src/iptv/servers.ts`
-**Data da implementacao**: 2026-07-31
-
-**Comportamento**: a cada chamada de `authenticate()`, o backend cria uma
-copia dos candidatos, remove os dominios bloqueados da sessao e embaralha o
-resultado com Fisher-Yates usando `crypto.randomInt`. O primeiro dominio que
-responder HTTP 200 com `user_info.auth === 1` se torna o servidor ativo.
-
-**Fallback**: se o dominio sorteado falhar, os demais sao tentados na mesma
-ordem aleatoria. A reautenticacao automatica de streams usa a mesma funcao e
-continua respeitando `blockedServers`.
-
-**Seguranca**: a lista de dominios continua somente no backend. A
-randomizacao nao altera o transporte das credenciais, os tokens de sessao ou
-as mensagens de erro.
-
-**Validacao**: `npm run typecheck` e `npm run build` aprovados; `npm run lint`
-aprovado com aviso preexistente de import nao utilizado em
-`backend/src/routes/transcode.ts`.
-
-**Status**: Implementado e validado.
-
----
-
-### 10. Logs do transcode sem tokens ou credenciais — IMPLEMENTADO
-
-**Arquivos**: `backend/src/iptv/transcode.ts`
-
-O stderr do FFmpeg pode conter a URL de entrada do painel. O backend agora
-mantem somente um trecho limitado do erro e mascara usuario/senha antes de
-registrar a mensagem. As mensagens de estado usam apenas os primeiros oito
-caracteres do token de sessao. O cleanup usa imports ESM, sem `require()`.
-
-**Status**: Implementado e validado por typecheck/build.
-
----
-
-### 11. Monitor local de sessoes — IMPLEMENTADO
-
-**Tipo**: observabilidade local
-**Arquivo**: `monitor-server.bat`
-**Data da implementacao**: 2026-07-31
-
-O monitor le somente `backend/sessions.json` e considera ativas as sessoes
-cujo `expiresAt` ainda nao expirou. Exibe apenas o `server.baseUrl`, o inicio
-e a expiracao da sessao. Usuario, senha e token nunca sao impressos.
-
-O monitor nao cria rota HTTP, nao faz requisicoes externas e deve ser
-executado somente por quem possui acesso local a pasta do projeto.
-
-**Status**: Implementado e validado.
-
----
-
 ## Resumo para decisao
 
 | Achado | Severidade | Status | Correcao |
@@ -344,3 +288,13 @@ Pendencia adicional conhecida: limite de processos ffmpeg concorrentes em
 5. Mensagens de erro nao expoe senha, dominio ou detalhes do servidor.
 6. Dominios IPTV ficam em um unico arquivo (`servers.ts`), nao espalhados.
 7. Stream URLs reescritas pelo backend (credenciais IPTV nunca chegam ao frontend).
+8. **Ordem dos servidores e randomizada** (Fisher-Yates em `auth.ts`); o
+   fallback de stream re-embaralha os restantes. Nao ha "primario" fixo.
+9. **Logs do backend sao legiveis e isolados**: pino em nivel `error`
+   (sem JSON de request/response); logs de negocio via `console.log`
+   (`[auth]`, `[stream]`, `[proxy]`, `[fallback]`, `[reauth]`, `[transcode]`)
+   vao SO para o console/`backend.log`, jamais para respostas HTTP ao
+   usuario. URLs upstream com credenciais sao mascaradas (`maskUrl`).
+10. **Imagens do catalogo sao proxiadas** pelo backend (`GET /api/img?u=...`);
+    o frontend nunca carrega `http://*` direto (evita Mixed Content e nao
+    expoe dominios IPTV no HTML do site).

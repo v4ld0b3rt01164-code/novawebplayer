@@ -10,11 +10,14 @@ Pasta: `scripts/windows/`
   cd backend
   npm run build
   ```
+- **pm2** instalado globalmente:
+  ```powershell
+  npm install -g pm2
+  ```
 - **cloudflared** instalado e autenticado:
   ```powershell
   cloudflared tunnel list
   ```
-- `curl` disponivel no PATH para o health check.
 
 ## Configuração
 
@@ -46,7 +49,12 @@ Isso cria 3 tarefas no Task Scheduler:
 
 - **NOVA Start**: inicia backend+tunnel no logon do Windows.
 - **NOVA Watchdog**: verifica saúde a cada 2 minutos, reinicia se offline.
-- **NOVA Periodic Restart**: reinicia o tunnel a cada 8 horas. Se o backend estiver healthy, reinicia apenas o tunnel (sessões preservadas). Se unhealthy, reinicia tudo.
+- **NOVA Periodic Restart**: roda `periodic-restart.ps1` a cada 8 horas.
+  Reset preventivo: se o backend estiver healthy, reinicia apenas o
+  tunnel (sessões em memória preservadas). Se unhealthy, reinicia tudo
+  (sessões sobrevivem em disco via `backend/sessions.json`). Não
+  substitui o watchdog — apenas evita estados inconsistentes acumulados
+  do tunnel.
 
 Para remover:
 
@@ -61,7 +69,7 @@ Para criar um atalho na área de trabalho que execute um dos scripts:
 1. Clique com botão direito na área de trabalho → **Novo** → **Atalho**.
 2. Aponte para o `.bat` desejado (ex.: `scripts\windows\restart.bat`).
 3. Dê um nome (ex.: "NOVA Restart").
-4. **Importante:** Não marque "Executar como administrador" — isso mudaria a sessão Windows usada pelos processos.
+4. **Importante:** Não marque "Executar como administrador" — isso mudaria a sessão Windows e causaria o erro `EPERM \\.\pipe\rpc.sock` no PM2.
 
 Se o atalho já existir e der o erro `EPERM`, verifique as propriedades do atalho e desmarque "Executar como administrador" se estiver habilitado.
 
@@ -69,5 +77,4 @@ Se o atalho já existir e der o erro `EPERM`, verifique as propriedades do atalh
 
 - O frontend é servido pelo próprio backend a partir de `backend/../frontend/dist` (mesma origem HTTPS: `novawebplayer.app`). Por isso, em produção, **não é necessário iniciar o Vite separadamente**.
 - `stop.bat` encerra todos os processos `cloudflared.exe`. Se você executa outros túneis no mesmo usuário, pare-os manualmente com `cloudflared tunnel stop <nome>`.
-- `restart.bat` inicia o backend e o tunnel sem janelas visiveis. Os logs ficam em `backend\backend.log`, `backend\backend-error.log`, `backend\cloudflared.log` e `backend\cloudflared-error.log`.
-- Para ver os logs: `Get-Content backend\backend.log -Wait` ou abra os arquivos `.log` gerados no backend.
+- Para ver logs do backend: `pm2 logs nova-backend`.

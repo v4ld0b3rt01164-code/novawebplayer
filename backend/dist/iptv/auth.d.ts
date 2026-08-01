@@ -5,7 +5,10 @@ export interface ActiveServer {
     password: string;
 }
 /**
- * Embaralha e percorre os domínios candidatos até um autenticar com sucesso.
+ * Percorre a lista de domínios candidatos (em ordem aleatória por chamada)
+ * até um autenticar com sucesso. A randomização faz com que cada login tente
+ * um servidor diferente primeiro, distribuindo carga e evitando travar sempre
+ * no mesmo domínio quando há instabilidade.
  *
  * @param excludeBaseUrls domínios a pular (ex: sabidamente bloqueados nesta
  * sessão). Usado pelo fallback em nível de stream; login normal não passa nada.

@@ -8,15 +8,19 @@ implementação — ele é a fonte de verdade de requisitos.
 
 - **Frontend**: React + Vite + TypeScript.
 - **Estilo**: TailwindCSS (utilitário, fácil de manter responsivo/iOS-safe).
-- **Player**: `<video>` HTML5 nativo + `hls.js` como fallback para navegadores
-  sem suporte nativo a HLS (Safari/iOS **não** deve usar hls.js — usar
-  reprodução nativa lá).
+- **Player**: componente unificado `VideoPlayer.tsx` que seleciona o pipeline
+  HLS por plataforma — `hls.js` em Chrome/Firefox/Edge desktop, HLS nativo
+  em Safari (macOS) e iOS (qualquer browser, todos WebKit por baixo). VOD/séries
+  (mp4) usam `<video>` nativo em todas as plataformas. Implementado em
+  `frontend/src/player/VideoPlayer.tsx:106-135` (invertido em 2026-07-30 para
+  resolver erro `MEDIA_ERR_SRC_NOT_SUPPORTED` em streams com áudio AC3/EAC3
+  no Chrome).
 - **Estado/dados remotos**: React Query (cache, retry, stale-while-revalidate).
 - **Parsing XMLTV**: parser XML leve no backend (ex.: `fast-xml-parser`),
   já que o backend é quem busca o `xmltv.php` de qualquer forma — evita
   mandar o XML bruto (potencialmente grande) para o navegador.
-- **Backend**: Node.js (Express ou Fastify), rodando na máquina local do
-  autor, exposto publicamente via **Cloudflare Tunnel** no domínio
+- **Backend**: Node.js + **Fastify 5** + TypeScript 6, rodando na máquina
+  local do autor, exposto publicamente via **Cloudflare Tunnel** no domínio
   **novawebplayer.app**. Responsabilidades do backend:
   - Autenticação com fallback entre os 8 domínios IPTV (ver PRD seção 3
     e 5);
@@ -34,38 +38,75 @@ implementação — ele é a fonte de verdade de requisitos.
 Se o agente decidir usar stack diferente, deve justificar no PR/commit e
 atualizar este arquivo.
 
-## Estrutura de pastas sugerida
+## Estrutura de pastas
 
 ```
 /frontend
   /src
-    /api          -> client HTTP simples, fala SÓ com o backend próprio
-                      (nunca com os domínios IPTV diretamente)
-    /player       -> componentes de vídeo (LivePlayer, VodPlayer)
+    /api          -> client HTTP (client.ts) + streamUrl.ts (constrói URLs
+                      /stream/... e /transcode/... com token)
+    /player       -> VideoPlayer.tsx (unificado HLS + MP4, fallback /transcode)
     /features
-      /auth       -> tela de login
-      /favorites  -> hook useFavorites, FavoriteButton, FavoritesScreen
-      /live       -> TV ao vivo (categorias, canais, EPG)
-      /movies     -> Filmes (VOD)
-      /series     -> Séries & Novelas (plataformas, temporadas, episódios)
-    /shared       -> componentes de UI genéricos, ícones SVG do menu
-    /types        -> tipagem TypeScript dos payloads (espelha o backend)
+      /auth       -> LoginScreen, AuthProvider, AuthContext, useAuth
+      /favorites  -> useFavorites, FavoriteButton, FavoritesScreen, index.ts
+      /live       -> LiveScreen (auto-play + fixed split) + epg.ts (helpers)
+      /movies     -> MoviesScreen (categorias + grid + player)
+      /series     -> SeriesScreen (renderMode poster/episodes/all + fixed split)
+      /menu       -> MenuScreen (3 botões SVG sem moldura)
+    /shared       -> Header, Loading, ErrorState, SectionTitle, Button
+    /types        -> index.ts (espelha backend) + errors.ts
+    /assets       -> SVGs/fontes processados pelo Vite
+  /public         -> favicon.svg + tv-ao-vivo.svg + filmes.svg
+                     + series-novelas.svg + favoritos.svg
+  /scripts        -> strip-crossorigin.cjs (pós-build)
 
 /backend
   /src
+    index.ts          -> Fastify bootstrap + @fastify/static + rate limit
+                         + trustProxy + headers de segurança + imgRoutes
     /iptv
-      servers.ts      -> lista dos 8 domínios candidatos (única fonte)
-      auth.ts         -> lógica de fallback + autenticação Xtream Codes
-      catalog.ts      -> proxy de live/vod/series (categorias, streams)
-      epg.ts          -> busca e parse do xmltv.php, cache em memória
-      proxy.ts        -> proxy dos streams (live/vod/series) + UpstreamHttpError
-      reauth.ts       -> re-autenticação com single-flight (dedup por sessão)
-      withFallback.ts -> wrapper de fallback para rotas de stream
-    /routes           -> rotas HTTP expostas em novawebplayer.app/api/* e /stream/*
-    /session          -> gestão de sessão do usuário logado -> servidor ativo
-                        (+ blockedServers Set + updateSessionServer)
-                        Sessões persistidas em disco (backend/sessions.json)
-                        para sobreviverem a restarts do backend.
+      servers.ts          -> lista dos 8 domínios candidatos (única fonte)
+      auth.ts             -> fallback + autenticação Xtream + shuffle Fisher-Yates
+      catalog.ts          -> proxy de live/vod/series (categorias, streams)
+                              + reescrita de URLs de imagem -> /api/img
+      categoryOrder.ts    -> ordenação/priorização de categorias
+      codec.ts            -> detecção de codec do stream
+      epg.ts              -> busca e parse do xmltv.php, cache 30 min em memória
+      proxy.ts            -> proxy dos streams (live/vod/series) + UpstreamHttpError
+                              + descoberta de IP real via redirect do .ts
+      reauth.ts           -> re-autenticação com single-flight (dedup por sessão)
+      withFallback.ts     -> wrapper de fallback (401/403) para rotas de stream
+      transcode.ts        -> pipeline ffmpeg HLS H.264/AAC (fallback de codec)
+      types.ts            -> tipagem Xtream Codes (XtreamAuthResponse, etc.)
+    /routes
+      auth.ts             -> POST /api/auth
+      health.ts           -> GET /api/health
+      live.ts             -> /api/live/* (categorias, streams, short_epg)
+      movies.ts           -> /api/movies/* (categorias, streams, info)
+      series.ts           -> /api/series/* (categorias, info + temporadas)
+      epg.ts              -> /api/epg/* (XMLTV parseado, canal específico)
+      img.ts              -> GET /api/img?u=... (proxy de imagens do catálogo)
+      stream.ts           -> /stream/:type/:file + /stream/seg/... (com fallback)
+      transcode.ts        -> /transcode/:type/:file + /transcode/seg/...
+      streamAuth.ts       -> auth via header Authorization OU ?token=...
+      middleware.ts       -> requireAuth (preHandler compartilhado)
+    /session
+      store.ts            -> sessões em memória + blockedServers Set +
+                              updateSessionServer; persistido em
+                              backend/sessions.json (debounced write 1s)
+    /shared
+      errors.ts           -> ApiError e variantes tipadas
+    /types
+      fastify.d.ts        -> augmentations de tipo para o Fastify
+  /public             -> favicon, SVGs do menu, index.html de referência
+                         (NÃO é o que o backend serve em produção — esse
+                         vem de /frontend/dist)
+  /scripts            -> healthcheck.js (chamado por `npm run healthcheck`)
+  /sessions.json      -> base de sessões persistida em disco
+  /dist               -> build do backend (`tsc` -> dist/index.js)
+  ecosystem.config.cjs            -> PM2 (Linux/macOS)
+  ecosystem.windows.config.cjs    -> PM2 (Windows — usado em produção)
+  nova-web-player.service          -> exemplo de unidade systemd
 ```
 
 ## Regras de implementação (obrigatórias)
@@ -183,13 +224,14 @@ Veja `scripts/windows/README.md` para detalhes.
 
 ### Checkpoints (git)
 
-O repositório é git local (sem remote). Estados estáveis validados recebem
-tag `checkpoint-AAAA-MM-DD` — os builds (`dist/`) são commitados de
-propósito para restauração imediata. Instruções completas de restauração e
-de criação de novos checkpoints: `RESTORE_POINT.md`. Agentes NÃO devem
-criar commits/tags sem pedido explícito do usuário (regra padrão), mas
-devem atualizar `STATUS.md`, `SECURITY.md` e `RESTORE_POINT.md` ao concluir
-mudanças relevantes.
+O repositório tem remote em `https://github.com/v4ld0b3rt01164-code/novawebplayer.git`
+(branch `main`). Estados estáveis validados recebem tag `checkpoint-AAAA-MM-DD`
+— os builds (`dist/`) são commitados de propósito para restauração imediata
+(ao restaurar, só `npm install` + `pm2 restart`, sem rebuild obrigatório).
+Instruções completas de restauração e de criação de novos checkpoints:
+`RESTORE_POINT.md`. Agentes NÃO devem criar commits/tags sem pedido explícito
+do usuário (regra padrão), mas devem atualizar `STATUS.md`, `SECURITY.md` e
+`RESTORE_POINT.md` ao concluir mudanças relevantes.
 
 ## O que NÃO fazer
 
