@@ -113,7 +113,8 @@ commitado corresponder ao codigo-fonte.
 - [x] **Rate limiting** (300 req/min global + 5 req/min em POST /api/auth, por IP real via trustProxy)
 - [x] **index.html sempre no-store** (hook onSend forca em text/html; assets com hash mantem cache 30d)
 - [x] **Fallback automatico para transcode** (Live -> HLS; Filmes/Séries -> MP4 H.264/AAC progressivo; erro de codec, `NotSupportedError` ou "toca mudo" no iOS/WebKit)
-- [x] **Fallback mobile VOD** (Android/iOS usam MP4 H.264/AAC preventivamente; rejeicao `NotSupportedError` e listener de erro continuam cobertos; MIME `.mp4` normalizado no proxy)
+- [x] **Fallback mobile VOD** (Android e desktop usam MP4 direto; iOS Safari/Chrome aciona MP4 H.264/AAC transcodificado apenas quando o navegador rejeita o codec)
+- [x] **Fullscreen iOS via webkitEnterFullscreen** (restrito a iOS Safari/Chrome; Android/desktop permanecem com o layout expandido por estado React)
 - [x] **Diagnostico e robustez do transcode** (sonda VOD antes do FFmpeg; troca de dominio em 502/503/504; headers compatíveis; stderr sanitizado; cleanup ESM sem `require()`)
 - [x] **Sessao persistida em disco** (sessions.json com debounced write, sobrevive a restarts do backend)
 

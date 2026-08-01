@@ -182,9 +182,15 @@ para buscar segmentos.
 
 ### Correcao de compatibilidade VOD mobile (2026-07-31)
 
-- Android e iOS agora usam preventivamente o endpoint `/transcode` para VOD e
-  series, entregando MP4 H.264/AAC normalizado. Live continua usando a fonte
-  HLS direta/fallback.
+- Filmes e Series no Android e desktop iniciam exclusivamente pelo `/stream`
+  (MP4 direto do painel com `Range` e `video/mp4`); o player so troca para o
+  `/transcode` no Safari/Chrome iOS quando o navegador rejeita o codec
+  (HEVC, AC3, MKV, "toca mudo"). Live continua com HLS direto e fallback
+  `/transcode/live` se necessario.
+- Fullscreen no iOS: o botao "Maximizar" chama `webkitEnterFullscreen()` no
+  `<video>` antes de aplicar o layout expandido. A funcao
+  `enterIosFullscreen()` em `frontend/src/player/fullscreen.ts` faz no-op em
+  Android/desktop; nenhum outro caminho foi alterado.
 - Causa identificada: o fallback antigo convertia Filmes/Séries para HLS. O
   Safari apresentava a etiqueta "Transmissao ao Vivo" mesmo sendo VOD.
 - Correcao: somente Live usa HLS. Filmes e Séries usam MP4 progressivo

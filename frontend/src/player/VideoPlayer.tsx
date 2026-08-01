@@ -7,10 +7,15 @@ interface VideoPlayerProps {
   poster?: string
   /**
    * URL alternativa via /transcode/... (ffmpeg -> H.264/AAC).
-   * Em VOD mobile ela é usada preventivamente; nos demais navegadores é
-   * tentada UMA vez quando a fonte principal reporta erro real de reprodução.
+   * Tentada UMA vez quando a fonte principal reporta erro real de reprodução.
    */
   fallbackSrc?: string
+  /**
+   * Callback opcional disparado quando o elemento <video> fica disponível.
+   * Usado apenas para acionar webkitEnterFullscreen() no iOS; em Android e
+   * desktop a prop e ignorada. O callback pode receber `null` ao desmontar.
+   */
+  onVideoElement?: (el: HTMLVideoElement | null) => void
 }
 
 // Propriedade não-padrão exposta apenas pelo WebKit (Safari/Chrome no iOS):
@@ -21,12 +26,16 @@ interface WebKitVideoElement extends HTMLVideoElement {
   webkitAudioDecodedByteCount?: number
 }
 
-function isMobileBrowser(): boolean {
+function detectIosWebKit(): boolean {
   if (typeof navigator === 'undefined') return false
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  const ua = navigator.userAgent
+  const isApple = /iPhone|iPad|iPod/i.test(ua)
+  if (!isApple) return false
+  // Chrome no iOS usa o motor do Safari (WebKit), entao o mesmo fallback se aplica.
+  return /WebKit| CriOS/i.test(ua)
 }
 
-export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProps) {
+export function VideoPlayer({ src, title, poster, fallbackSrc, onVideoElement }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const srcRef = useRef('')
@@ -56,16 +65,22 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
 
   // Troca para a URL de transcode e reinicia o playback. Retorna false se
   // não houver fallback disponível ou se ele já foi tentado nesta sessão
-  // de reprodução (evita loop se o transcode também falhar).
+  // de reprodução (evita loop se o transcode também falhar). Para VOD,
+  // o transcode é usado apenas no iOS (Safari/Chrome iOS), que não
+  // consegue decodificar alguns codecs (HEVC, AC3, MKV). Android e desktop
+  // seguem no MP4 direto, que é confiável.
   const tryFallback = useCallback((): boolean => {
     if (!fallbackSrc || triedFallbackRef.current) return false
     if (activeSrcRef.current === fallbackSrc) return false
+    const cleanPath = (activeSrcRef.current || src).split('?')[0]
+    const isHls = cleanPath.endsWith('.m3u8') || cleanPath.startsWith('/transcode/live/')
+    if (!isHls && !detectIosWebKit()) return false
     triedFallbackRef.current = true
     console.warn('[Player] fonte direta falhou; tentando transcode')
     activeSrcRef.current = fallbackSrc
     startPlaybackRef.current()
     return true
-  }, [fallbackSrc])
+  }, [fallbackSrc, src])
 
   const startPlayback = useCallback(() => {
     const video = videoRef.current
@@ -81,28 +96,6 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
 
     // iOS Safari não suporta MSE (hls.js) e frequentemente não consegue
     // decodificar VOD não-HLS (MP4/MKV com codecs incompatíveis).
-    // Android também pode rejeitar o MP4 do painel por codec/container ou
-    // por uma resposta Range incompatível. Em VOD mobile, usa o pipeline
-    // normalizado H.264/AAC imediatamente; Live continua HLS.
-    const isIOSWebKit =
-      !Hls.isSupported() &&
-      typeof document !== 'undefined' &&
-      !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl')
-
-    const sourcePath = url.split('?')[0]
-    const sourceIsHls = sourcePath.endsWith('.m3u8')
-    const preferMobileVod =
-      !!fallbackSrc &&
-      !sourceIsHls &&
-      !sourcePath.startsWith('/transcode/') &&
-      (isIOSWebKit || isMobileBrowser())
-
-    if (preferMobileVod && fallbackSrc) {
-      url = fallbackSrc
-      activeSrcRef.current = fallbackSrc
-      triedFallbackRef.current = true
-    }
-
     const playVideo = () => {
       video.play().catch((reason: unknown) => {
         const errorName =
@@ -282,6 +275,18 @@ export function VideoPlayer({ src, title, poster, fallbackSrc }: VideoPlayerProp
   useEffect(() => {
     return () => destroyHls()
   }, [destroyHls])
+
+  // Expoe o <video> para consumidores que precisem acionar fullscreen nativo
+  // (iOS). No-op quando onVideoElement nao e fornecido; em Android/desktop a
+  // logica de fullscreen e responsabilidade do consumidor (no-op em outros
+  // navegadores via detectIosWebKit).
+  useEffect(() => {
+    if (!onVideoElement) return
+    onVideoElement(videoRef.current)
+    return () => {
+      onVideoElement(null)
+    }
+  }, [onVideoElement])
 
   if (error) {
     return (

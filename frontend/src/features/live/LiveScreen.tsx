@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createApiClient } from '../../api/client.js'
 import { liveStreamUrl, liveTranscodeUrl } from '../../api/streamUrl.js'
 import { ErrorState } from '../../shared/ErrorState.js'
@@ -7,6 +7,7 @@ import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
 import { SectionTitle } from '../../shared/SectionTitle.js'
 import { VideoPlayer } from '../../player/VideoPlayer.js'
+import { enterIosFullscreen } from '../../player/fullscreen.js'
 import { useAuth } from '../auth/useAuth.js'
 import { FavoriteButton } from '../favorites/FavoriteButton.js'
 import { useFavorites } from '../favorites/useFavorites.js'
@@ -40,6 +41,13 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
     useState<XtreamLiveStream | null>(null)
   const [maximized, setMaximized] = useState(false)
   const { favorites } = useFavorites()
+  const videoElRef = useRef<HTMLVideoElement | null>(null)
+  const onVideoElement = useCallback(
+    (el: HTMLVideoElement | null) => {
+      videoElRef.current = el
+    },
+    [],
+  )
 
   const categoriesQuery = useQuery({
     queryKey: ['live', 'categories'],
@@ -103,6 +111,7 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
             src={liveStreamUrl(selectedChannel.stream_id, token)}
             fallbackSrc={liveTranscodeUrl(selectedChannel.stream_id, token)}
             title={selectedChannel.name}
+            onVideoElement={onVideoElement}
           />
           <button
             type="button"
@@ -155,11 +164,15 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
                   src={liveStreamUrl(selectedChannel.stream_id, token)}
                   fallbackSrc={liveTranscodeUrl(selectedChannel.stream_id, token)}
                   title={selectedChannel.name}
+                  onVideoElement={onVideoElement}
                 />
               </div>
               <button
                 type="button"
-                onClick={() => setMaximized(true)}
+                onClick={() => {
+                  enterIosFullscreen(videoElRef.current)
+                  setMaximized(true)
+                }}
                 className="absolute right-2 top-2 z-10 rounded-lg bg-black/60 p-2 text-white backdrop-blur-sm active:scale-95"
                 aria-label="Maximizar"
               >

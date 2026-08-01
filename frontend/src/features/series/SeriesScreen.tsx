@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createApiClient } from '../../api/client.js'
 import { seriesStreamUrl, seriesTranscodeUrl } from '../../api/streamUrl.js'
 import { ErrorState } from '../../shared/ErrorState.js'
 import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
 import { VideoPlayer } from '../../player/VideoPlayer.js'
+import { enterIosFullscreen } from '../../player/fullscreen.js'
 import { useAuth } from '../auth/useAuth.js'
 import { FavoriteButton } from '../favorites/FavoriteButton.js'
 import { useFavorites } from '../favorites/useFavorites.js'
@@ -60,6 +61,13 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
   const [globalSearch, setGlobalSearch] = useState('')
   const isDesktop = useIsDesktopViewport()
   const { favorites } = useFavorites()
+  const videoElRef = useRef<HTMLVideoElement | null>(null)
+  const onVideoElement = useCallback(
+    (el: HTMLVideoElement | null) => {
+      videoElRef.current = el
+    },
+    [],
+  )
 
   const categoriesQuery = useQuery({
     queryKey: ['series', 'categories'],
@@ -93,7 +101,7 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
             onBack={() => setView({ ...view, maximized: false })}
           />
           <div className="relative w-full flex-1 bg-black">
-            <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} />
+            <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} onVideoElement={onVideoElement} />
             <button
               type="button"
               onClick={() => setView({ ...view, maximized: false })}
@@ -112,11 +120,14 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
     const playerBlock = (
       <div className="relative w-full overflow-hidden rounded-xl bg-black">
         <div className="aspect-video w-full">
-          <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} />
+          <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} onVideoElement={onVideoElement} />
         </div>
         <button
           type="button"
-          onClick={() => setView({ ...view, maximized: true })}
+          onClick={() => {
+            enterIosFullscreen(videoElRef.current)
+            setView({ ...view, maximized: true })
+          }}
           className="absolute right-2 top-2 z-10 rounded-lg bg-black/60 p-2 text-white backdrop-blur-sm active:scale-95"
           aria-label="Maximizar"
         >
