@@ -46,6 +46,7 @@ atualizar este arquivo.
     /api          -> client HTTP (client.ts) + streamUrl.ts (constrói URLs
                       /stream/... e /transcode/... com token)
     /player       -> VideoPlayer.tsx (unificado HLS + MP4, fallback /transcode)
+                     + fullscreen.ts (webkitEnterFullscreen iOS, no-op fora)
     /features
       /auth       -> LoginScreen, AuthProvider, AuthContext, useAuth
       /favorites  -> useFavorites, FavoriteButton, FavoritesScreen, index.ts
@@ -248,7 +249,13 @@ do usuário (regra padrão), mas devem atualizar `STATUS.md`, `SECURITY.md` e
   Usar `fixed inset-0 z-50` para travar a viewport e garantir que o
   player sempre fique visivel. A coluna de conteudo usa `overflow-y-auto`
   com `min-h-0` para rolar internamente.
-- **Fullscreen nativo no mobile ainda nao funciona**: O botao flutuante
-  de maximizar series usa `maximized: true` (padrao React, mesmo do
-  FILMES) mas no iOS/Android so rotaciona a tela. Pendente: implementar
-  Fullscreen API do navegador (`requestFullscreen()`).
+- **Fullscreen no mobile**: no iOS, o botao Maximizar chama
+  `webkitEnterFullscreen()` no `<video>` e NAO altera o estado React
+  (`maximized`) — o player nativo do iOS assume a tela inteira; trocar o
+  estado re-renderiza e desmonta o `<video>`, o que faz o iOS cancelar o
+  fullscreen. Fora do iOS (Android/desktop), o botao usa o layout
+  maximizado CSS (`maximized: true`, container `fixed inset-0 z-50`).
+  Helpers em `frontend/src/player/fullscreen.ts`
+  (`canUseIosNativeFullscreen` + `enterIosFullscreen`, no-op fora do iOS).
+  `requestFullscreen()` em Android/desktop segue nao implementado
+  (comportamento CSS atual e considerado OK).

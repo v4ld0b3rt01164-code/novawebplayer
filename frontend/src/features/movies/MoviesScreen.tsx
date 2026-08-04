@@ -6,7 +6,7 @@ import { ErrorState } from '../../shared/ErrorState.js'
 import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
 import { VideoPlayer } from '../../player/VideoPlayer.js'
-import { enterIosFullscreen } from '../../player/fullscreen.js'
+import { canUseIosNativeFullscreen, enterIosFullscreen } from '../../player/fullscreen.js'
 import { useAuth } from '../auth/useAuth.js'
 import { FavoriteButton } from '../favorites/FavoriteButton.js'
 import { useFavorites } from '../favorites/useFavorites.js'
@@ -73,9 +73,9 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
     const streamUrl = movieStreamUrl(view.movie.stream_id, view.movie.container_extension, token)
     const transcodeUrl = movieTranscodeUrl(view.movie.stream_id, view.movie.container_extension, token)
     return (
-      <div className="flex min-h-full flex-col">
+      <div className="fixed inset-0 z-50 flex flex-col bg-bg">
         <Header title={view.movie.name} onBack={() => { setMaximized(false); setView({ type: 'home' }) }} />
-        <div className="relative w-full flex-1 bg-black">
+        <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-black">
                 <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.movie.name} onVideoElement={onVideoElement} />
           <button
             type="button"
@@ -110,7 +110,12 @@ export function MoviesScreen({ onBack }: MoviesScreenProps) {
               <button
                 type="button"
                 onClick={() => {
-                  enterIosFullscreen(videoElRef.current)
+                  // iOS: o fullscreen nativo assume a tela (sem trocar o estado,
+                  // senao o React desmonta o <video> e o iOS cancela o fullscreen).
+                  if (canUseIosNativeFullscreen(videoElRef.current)) {
+                    enterIosFullscreen(videoElRef.current)
+                    return
+                  }
                   setMaximized(true)
                 }}
                 className="absolute right-2 top-2 z-10 rounded-lg bg-black/60 p-2 text-white backdrop-blur-sm active:scale-95"

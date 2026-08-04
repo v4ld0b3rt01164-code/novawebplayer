@@ -6,7 +6,7 @@ import { ErrorState } from '../../shared/ErrorState.js'
 import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
 import { VideoPlayer } from '../../player/VideoPlayer.js'
-import { enterIosFullscreen } from '../../player/fullscreen.js'
+import { canUseIosNativeFullscreen, enterIosFullscreen } from '../../player/fullscreen.js'
 import { useAuth } from '../auth/useAuth.js'
 import { FavoriteButton } from '../favorites/FavoriteButton.js'
 import { useFavorites } from '../favorites/useFavorites.js'
@@ -95,12 +95,12 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
 
     if (view.maximized) {
       return (
-        <div className="flex min-h-full flex-col">
+        <div className="fixed inset-0 z-50 flex flex-col bg-bg">
           <Header
             title={view.serie.name}
             onBack={() => setView({ ...view, maximized: false })}
           />
-          <div className="relative w-full flex-1 bg-black">
+          <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-black">
             <VideoPlayer src={streamUrl} fallbackSrc={transcodeUrl} title={view.episode.title} onVideoElement={onVideoElement} />
             <button
               type="button"
@@ -125,7 +125,12 @@ export function SeriesScreen({ onBack }: SeriesScreenProps) {
         <button
           type="button"
           onClick={() => {
-            enterIosFullscreen(videoElRef.current)
+            // iOS: o fullscreen nativo assume a tela (sem trocar o estado,
+            // senao o React desmonta o <video> e o iOS cancela o fullscreen).
+            if (canUseIosNativeFullscreen(videoElRef.current)) {
+              enterIosFullscreen(videoElRef.current)
+              return
+            }
             setView({ ...view, maximized: true })
           }}
           className="absolute right-2 top-2 z-10 rounded-lg bg-black/60 p-2 text-white backdrop-blur-sm active:scale-95"

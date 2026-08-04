@@ -3,10 +3,14 @@
  *
  * O <video> em iOS precisa do webkitEnterFullscreen() para ocupar a tela
  * inteira; do contrario, fica limitado ao container CSS. Android e desktop
- * NAO devem ser afetados por este modulo: as funcoes abaixo fazem no-op
- * fora do iOS e o botao de maximizar nas telas so as chama quando
- * detectIosWebKit() for true.
+ * NAO devem ser afetados por este modulo: canUseIosNativeFullscreen()
+ * retorna false fora do iOS e os botoes de maximizar seguem o caminho do
+ * layout maximizado via CSS.
  */
+
+interface WebKitFullscreenVideoElement extends HTMLVideoElement {
+  webkitEnterFullscreen?: () => void
+}
 
 function isIosWebKit(): boolean {
   if (typeof navigator === 'undefined') return false
@@ -18,17 +22,30 @@ function isIosWebKit(): boolean {
 }
 
 /**
+ * Diz se da para entrar no fullscreen nativo iOS agora: precisa ser iOS
+ * WebKit e o <video> precisa expor webkitEnterFullscreen(). Os botoes de
+ * maximizar usam isso para decidir entre fullscreen nativo (iOS) e o
+ * layout maximizado via CSS (Android/desktop/fallback).
+ */
+export function canUseIosNativeFullscreen(
+  videoEl: HTMLVideoElement | null,
+): boolean {
+  if (!isIosWebKit()) return false
+  if (!videoEl) return false
+  return (
+    typeof (videoEl as WebKitFullscreenVideoElement).webkitEnterFullscreen ===
+    'function'
+  )
+}
+
+/**
  * Solicita fullscreen nativo em um <video>. No-op se o navegador nao for
  * iOS Safari/Chrome ou se o metodo webkit nao estiver disponivel.
  */
 export function enterIosFullscreen(videoEl: HTMLVideoElement | null): void {
-  if (!isIosWebKit()) return
-  if (!videoEl) return
-  const el = videoEl as HTMLVideoElement & {
-    webkitEnterFullscreen?: () => void
-  }
+  if (!canUseIosNativeFullscreen(videoEl)) return
   try {
-    el.webkitEnterFullscreen?.()
+    ;(videoEl as WebKitFullscreenVideoElement).webkitEnterFullscreen?.()
   } catch {
     // ignora: webkitEnterFullscreen pode lancar em algumas paginas
   }

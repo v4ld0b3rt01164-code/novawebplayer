@@ -1,10 +1,12 @@
 # STATUS — NOVA Web Player
 
-Documento vivo do estado atual do projeto. Atualizado em: 2026-07-31
-(Login aleatorio entre 8 dominios; monitor local de sessoes; restart sem janelas visiveis;
-Favoritos: categoria dentro de Live, Movies e Series com persistencia localStorage;
-fallback mobile para VOD com formato/codec recusado).
-**Nota conhecida**: Maximizar series mobile so rotaciona tela (nao fullscreen nativo).
+Documento vivo do estado atual do projeto. Atualizado em: 2026-08-04
+(Fullscreen iOS corrigido: player nativo via webkitEnterFullscreen sem remount
+do <video>; layout maximizado travado com fixed inset-0 — sem barra de rolagem
+em paisagem no iPhone).
+**Nota conhecida**: Fullscreen nativo em Android/desktop segue via layout
+maximizado CSS (requestFullscreen() ainda nao implementado; comportamento
+atual validado como OK nessas plataformas).
 
 ---
 
@@ -151,7 +153,7 @@ para buscar segmentos.
 - **Layout split fixo (desktop)**: detalhe + lista de episodios na coluna esquerda (scroll), mini-player 50% na direita.
 - **Layout mobile**: poster+sinopse topo → miniplayer (com botao flutuante maximizar) → temporadas+episodios (scroll).
 - **renderMode** no `SeriesDetailContent`: `poster` | `episodes` | `all` (controle de o que renderizar).
-- **Maximizar**: botao flutuante seta `maximized: true` -> player em tela cheia com botao minimizar (mesmo padrao FILMES). **Nota: no mobile so rotaciona a tela, nao ativa fullscreen nativo.**
+- **Maximizar**: botao flutuante seta `maximized: true` -> player em tela cheia com botao minimizar (mesmo padrao FILMES). **No iOS, o botao entra no fullscreen nativo do player (webkitEnterFullscreen) sem trocar o estado; Android/desktop usam o layout maximizado CSS.**
 - Player: `<video>` nativo (mp4).
 
 ### Player (VideoPlayer.tsx)
@@ -214,6 +216,39 @@ para buscar segmentos.
   derrubava o backend quando um transcode ocioso era limpo.
 - Validacao em dispositivo real: pendente após reinício do backend, cobrindo
   iPhone Safari, iPhone Chrome, Android e um conteúdo VOD que falhava.
+
+### Correcao do fullscreen iOS (2026-08-04)
+
+- Sintoma: no iPhone (teste: 14 Pro Max, tela 19.5:9) em paisagem, o modo
+  tela cheia de Series/Filmes preenchia a largura total e o height ficava
+  enorme, gerando barra de rolagem na area do video. O botao de maximizar
+  tambem nao sustentava o fullscreen nativo ("so rotacionava a tela").
+- Causa 1 (layout): as views maximizadas usavam `flex min-h-full flex-col`
+  com o `<video h-full w-full>` dentro de item `flex-1`. No iOS Safari a
+  cadeia `height: 100%` nao resolve atraves de pai com altura `auto`, entao
+  o video caia para altura automatica com a proporcao intrinseca 16:9 sobre
+  a largura total — maior que a viewport em paisagem -> rolagem.
+- Causa 2 (botao): o handler chamava `webkitEnterFullscreen()` e logo em
+  seguida alternava o estado `maximized`; o re-render desmontava o `<video>`
+  que acabara de entrar em fullscreen e o iOS cancelava o fullscreen.
+- Correcao:
+  - Views maximizadas (Live/Series/Filmes): container
+    `fixed inset-0 z-50 flex flex-col` + wrapper do video
+    `min-h-0 overflow-hidden` (mesma regra do split layout, AGENTS.md).
+    EPG do Live maximizado virou `min-h-0 flex-1 overflow-y-auto`.
+  - Botao Maximizar: no iOS WebKit com `webkitEnterFullscreen` disponivel,
+    entra apenas no fullscreen nativo e NAO troca o estado React (sem
+    remount do `<video>`); sair pelo controle nativo do iOS devolve a view
+    inline intacta. Fora do iOS (Android/desktop) segue o `maximized: true`.
+  - `frontend/src/player/fullscreen.ts`: novo export
+    `canUseIosNativeFullscreen()` usado pelos tres botoes.
+- Escopo pedido pelo autor: somente iOS; Android e desktop mantidos como
+  estavam (comportamento validado como OK).
+- Arquivos: `frontend/src/player/fullscreen.ts`,
+  `frontend/src/features/{live/LiveScreen,series/SeriesScreen,movies/MoviesScreen}.tsx`.
+- Validacao: typecheck + build OK; lint com erros rules-of-hooks
+  preexistentes (mesmos no HEAD, nao introduzidos aqui). Teste real no
+  iPhone segue pendente.
 
 ---
 
@@ -297,7 +332,7 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - **renderMode (poster/episodes/all): OK**
 - Layout split fixo series desktop (detalhe fixo + episodios scrollaveis + player): OK
 - Botao maximizar/minimizar series desktop: OK
-- **Botao maximizar series mobile: so rotaciona tela (pendente fullscreen nativo)**
+- **Botao maximizar mobile: iOS entra no fullscreen nativo (webkitEnterFullscreen); Android/desktop usam layout maximizado CSS — 2026-08-04 (teste real no iPhone pendente)**
 - Menu responsivo (sem moldura, 3 colunas mobile): OK
 - Busca em filmes e series: OK
 - **Favoritos: categoria dentro de Live, Movies e Series — OK**
@@ -330,7 +365,13 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 6. **VideoPlayer detecta extensao**: `.m3u8` usa hls.js, outra usa nativo.
 7. **Frontend servido pelo backend**: Nao usar Cloudflare Pages (evita CORS).
 8. **Layout split precisa de fixed inset-0**: Usar `min-h-full` em telas com split causa problemas — o player some quando rola. Solucao: `fixed inset-0 z-50` trava a viewport. Coluna de conteudo usa `overflow-y-auto` com `min-h-0`.
-9. **Maximizar series mobile nao vai fullscreen nativo**: Botao flutuante seta `maximized: true` (padrao FILMES) mas no iOS/Android so rotaciona a tela. Pendente: usar Fullscreen API do navegador.
+9. **Maximizar em tela com player precisa de viewport travada**: `min-h-full`
+   em view maximizada faz o iOS Safari resolver a altura do `<video>` pela
+   proporcao intrinseca (16:9 sobre a largura total) -> overflow e rolagem em
+   paisagem. Usar `fixed inset-0 z-50` + `min-h-0 overflow-hidden` no wrapper
+   do video. E no iOS, nunca alternar estado React junto com
+   `webkitEnterFullscreen()`: o re-render desmonta o `<video>` e o iOS cancela
+   o fullscreen (resolvido em 2026-08-04 — ver secao 5).
 
 ---
 
@@ -341,7 +382,8 @@ cd backend; npm start        # http://localhost:3001 + serve frontend/dist
 - [x] ~~Auto-play primeiro canal~~ (implementado: useEffect + useRef)
 - [x] ~~Layout mobile series (poster+player+episodios)~~ (implementado: renderMode)
 - [x] ~~Favoritos~~ (implementado: categoria dentro de Live, Movies e Series com persistencia localStorage)
-- [ ] **Fullscreen nativo no mobile** (requestFullscreen API no video — pendente)
+- [x] ~~Fullscreen nativo no iOS~~ (webkitEnterFullscreen sem remount + layout maximizado fixed; 2026-08-04 — teste real no iPhone pendente)
+- [ ] requestFullscreen() em Android/desktop (opcional; layout CSS atual e considerado OK)
 - [ ] EPG completo (xmltv parsing mais robusto)
 - [ ] Fallback de catalogo (categories/VOD) — mesma arquitetura de reauth.ts
 - [ ] PWA manifest

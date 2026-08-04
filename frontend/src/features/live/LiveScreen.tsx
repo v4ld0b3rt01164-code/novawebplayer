@@ -7,7 +7,7 @@ import { Header } from '../../shared/Header.js'
 import { Loading } from '../../shared/Loading.js'
 import { SectionTitle } from '../../shared/SectionTitle.js'
 import { VideoPlayer } from '../../player/VideoPlayer.js'
-import { enterIosFullscreen } from '../../player/fullscreen.js'
+import { canUseIosNativeFullscreen, enterIosFullscreen } from '../../player/fullscreen.js'
 import { useAuth } from '../auth/useAuth.js'
 import { FavoriteButton } from '../favorites/FavoriteButton.js'
 import { useFavorites } from '../favorites/useFavorites.js'
@@ -104,9 +104,9 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
 
   if (selectedChannel && maximized) {
     return (
-      <div className="flex min-h-full flex-col">
+      <div className="fixed inset-0 z-50 flex flex-col bg-bg">
         <Header title={selectedChannel.name} onBack={() => { setMaximized(false); setSelectedChannel(null) }} />
-        <div className="relative w-full flex-1 bg-black">
+        <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-black">
           <VideoPlayer
             src={liveStreamUrl(selectedChannel.stream_id, token)}
             fallbackSrc={liveTranscodeUrl(selectedChannel.stream_id, token)}
@@ -124,7 +124,7 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
             </svg>
           </button>
         </div>
-        <div className="flex-1 p-4">
+        <div className="max-h-[35%] shrink-0 overflow-y-auto p-4">
           <EpgInfo channel={selectedChannel} epgData={epgQuery.data} />
         </div>
       </div>
@@ -170,7 +170,12 @@ export function LiveScreen({ onBack }: LiveScreenProps) {
               <button
                 type="button"
                 onClick={() => {
-                  enterIosFullscreen(videoElRef.current)
+                  // iOS: o fullscreen nativo assume a tela (sem trocar o estado,
+                  // senao o React desmonta o <video> e o iOS cancela o fullscreen).
+                  if (canUseIosNativeFullscreen(videoElRef.current)) {
+                    enterIosFullscreen(videoElRef.current)
+                    return
+                  }
                   setMaximized(true)
                 }}
                 className="absolute right-2 top-2 z-10 rounded-lg bg-black/60 p-2 text-white backdrop-blur-sm active:scale-95"
